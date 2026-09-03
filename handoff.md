@@ -16,11 +16,13 @@
 
 ## ⚠️ 注意事項
 - 網頁已發布於 GitHub Pages，免裝任何軟體，直接以 Chrome / Edge 開啟即可。
+- PDF 產出已採用獨立純淨 DOM 容器與左右 6mm 安全邊界，徹底消除水平滾動造成的左右裁切問題，保證 100% 容納於 1 頁 A4 橫式紙張。
 
 ## 🕐 最後更新
-- 時間：2026-09-03 23:47
+- 時間：2026-09-03 23:59
 - 更新者：Antigravity @ jiangruiyideMacBook-Air.local
 - Git push：✅ 已推（線上網址：https://a1b228-blip.github.io/pharmacy-minor-replenishment/）
+
 
 
 
