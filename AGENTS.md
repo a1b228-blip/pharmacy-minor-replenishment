@@ -27,7 +27,8 @@
 | 層級 | 平台 | 位置 | 讀取時機 |
 |------|------|------|---------|
 | L1 | 本地 | `AGENTS.md`＋`handoff.md` | 每個 session |
-| L2 | GitHub | a1b228-blip/pharmacy-minor-replenishment | 指定時 |
+| L2 | GitHub | [a1b228-blip/pharmacy-minor-replenishment](https://github.com/a1b228-blip/pharmacy-minor-replenishment) ｜ 線上網址：[https://a1b228-blip.github.io/pharmacy-minor-replenishment/](https://a1b228-blip.github.io/pharmacy-minor-replenishment/) | 指定時 |
+
 | L3 | Obsidian | 藥劑科小藥撥補單/專案工作流程.md | 有需要時 |
 
 ## 工作約定

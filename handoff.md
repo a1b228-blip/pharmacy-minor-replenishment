@@ -12,14 +12,15 @@
 工具與轉換腳本皆測試完畢，產出格式與主管要求之欄位順序、名稱、寬度及格線 100% 一致。
 
 ## ➡️ 下一步
-每週下載 Excel 後，可直接拖入 `index.html` 一鍵列印/匯出，或執行 `python3 convert.py <檔案路徑>` 自動轉檔。
+提供主管線上網址：https://a1b228-blip.github.io/pharmacy-minor-replenishment/，直接在 Chrome 拖入每週下載的 Excel 即可使用。
 
 ## ⚠️ 注意事項
-- 主管格式共保留 13 個原始欄位，並在第 14 欄附加空白「單位簽收人/日期」，供現場人工簽收。
+- 網頁已發布於 GitHub Pages，免裝任何軟體，直接以 Chrome / Edge 開啟即可。
 
 ## 🕐 最後更新
-- 時間：2026-09-03 23:00
+- 時間：2026-09-03 23:47
 - 更新者：Antigravity @ jiangruiyideMacBook-Air.local
-- Git push：✅ 已推（a1b228-blip/pharmacy-minor-replenishment）
+- Git push：✅ 已推（線上網址：https://a1b228-blip.github.io/pharmacy-minor-replenishment/）
+
 
 
