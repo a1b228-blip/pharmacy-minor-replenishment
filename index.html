@@ -26,8 +26,8 @@
         /* 螢幕預覽表格樣式 */
         .preview-table th, .preview-table td {
             border: 1px solid #cbd5e1;
-            padding: 4px 6px;
-            font-size: 11px;
+            padding: 5px 6px;
+            font-size: 11.5px;
             vertical-align: middle;
         }
 
@@ -38,11 +38,11 @@
             white-space: pre-line;
         }
 
-        /* 列印專用樣式 (@media print) - 強制一張 A4 橫向最適化 */
+        /* 列印專用樣式 (@media print) - 最大化字體並維持單頁 A4 橫式 */
         @media print {
             @page {
                 size: A4 landscape;
-                margin: 5mm 5mm 5mm 5mm;
+                margin: 4mm 4mm 4mm 4mm;
             }
 
             .no-print, header, nav, .upload-section, .controls-section, .action-buttons, footer {
@@ -71,14 +71,14 @@
             .print-table {
                 width: 100% !important;
                 border-collapse: collapse !important;
-                font-size: 7.5pt !important;
+                font-size: 8.2pt !important;
                 line-height: 1.15 !important;
                 table-layout: auto !important;
             }
 
             .print-table th, .print-table td {
                 border: 0.8px solid #334155 !important;
-                padding: 2.5px 3px !important;
+                padding: 2px 2.5px !important;
                 color: black !important;
                 background: transparent !important;
             }
@@ -104,7 +104,7 @@
                 margin-top: 10px !important;
                 display: flex !important;
                 justify-content: space-between !important;
-                font-size: 8.5pt !important;
+                font-size: 9.5pt !important;
                 font-weight: 600 !important;
                 page-break-inside: avoid !important;
             }
@@ -123,7 +123,7 @@
                 </div>
                 <div>
                     <h1 class="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">佳里奇美醫院 藥劑科小藥撥補單列印助手</h1>
-                    <p class="text-xs text-gray-500 mt-0.5">主管 14 欄標準格式（含「單位簽收人/日期」） • <strong>一鍵匯出單頁橫式 A4 PDF</strong> • 精簡 Excel 下載</p>
+                    <p class="text-xs text-gray-500 mt-0.5">主管 14 欄標準格式（含「單位簽收人/日期」） • <strong>單頁橫式 A4 PDF 匯出（字體最大化）</strong></p>
                 </div>
             </div>
             <div class="flex items-center gap-2">
@@ -195,7 +195,7 @@
                     </label>
                 </div>
 
-                <!-- 動作按鈕組 (三大匯出模式) -->
+                <!-- 動作按鈕組 -->
                 <div class="flex flex-wrap items-center gap-2.5">
                     <button id="btn-export-excel" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition">
                         <span>📥</span> 匯出主管格式 Excel
@@ -210,22 +210,12 @@
             </div>
         </section>
 
-        <!-- 列印與預覽區域 -->
-        <main id="print-area" class="hidden bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-200 space-y-3">
+        <!-- 列印與預覽區域 (乾淨俐落表頭、字體最大化、三方簽核) -->
+        <main id="print-area" class="hidden bg-white p-3 sm:p-5 rounded-2xl shadow-sm border border-gray-200 space-y-2">
             
-            <!-- 表頭資訊 -->
-            <div class="border-b-2 border-gray-800 pb-1.5">
-                <div class="flex justify-between items-end">
-                    <div>
-                        <h2 class="text-base sm:text-lg font-black text-gray-900 tracking-wide">佳里奇美醫院 藥劑科小藥撥補單</h2>
-                        <p class="text-[11px] text-gray-600 mt-0.5" id="print-meta-summary">
-                            列印日期：<span id="print-date"></span> ｜ 筆數：<span id="print-count">0</span> 筆 ｜ 格式：主管標準格式 (含單位簽收人/日期)
-                        </p>
-                    </div>
-                    <div class="text-right text-[11px] text-teal-800 font-semibold bg-teal-50 px-2 py-0.5 rounded no-print">
-                        【A4 橫式單頁最適化】
-                    </div>
-                </div>
+            <!-- 表頭主標題 (已移除副標題與日期筆數說明文字) -->
+            <div class="text-center pb-2 border-b border-gray-300">
+                <h2 class="text-lg sm:text-xl font-black text-gray-900 tracking-wider">佳里奇美醫院 藥劑科小藥撥補單</h2>
             </div>
 
             <!-- 資料表格 -->
@@ -240,10 +230,10 @@
                 </table>
             </div>
 
-            <!-- 表尾簽核區 -->
-            <div class="signature-block pt-3 border-t border-gray-400 mt-3 flex justify-between text-xs font-medium text-gray-800">
-                <div>製表人：____________________</div>
-                <div>發料藥佐 / 藥師：____________________</div>
+            <!-- 表尾簽核區 (無製表人，包含：發料藥佐、核對藥師、領料單位簽收) -->
+            <div class="signature-block pt-3 mt-3 flex justify-between text-xs sm:text-sm font-medium text-gray-800">
+                <div>發料藥佐：____________________</div>
+                <div>核對藥師：____________________</div>
                 <div>領料單位簽收：____________________</div>
             </div>
 
@@ -290,7 +280,7 @@
             { id: '單位簽收人/日期', name: '單位簽收人/日期', defaultSelected: true }
         ];
 
-        const STORAGE_KEY = 'cch_pharmacy_supervisor_cols_v3';
+        const STORAGE_KEY = 'cch_pharmacy_supervisor_cols_v4';
 
         let rawData = [];
         let filteredData = [];
@@ -335,24 +325,10 @@
         const btnExportPdf = document.getElementById('btn-export-pdf');
         const btnExportExcel = document.getElementById('btn-export-excel');
         const btnLoadSample = document.getElementById('btn-load-sample');
-        const printDateSpan = document.getElementById('print-date');
-        const printCountSpan = document.getElementById('print-count');
 
         function init() {
             renderColumnCheckboxes();
             bindEvents();
-            updatePrintDate();
-        }
-
-        function updatePrintDate() {
-            const now = new Date();
-            printDateSpan.textContent = now.toLocaleDateString('zh-TW', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
         }
 
         function renderColumnCheckboxes() {
@@ -437,12 +413,7 @@
 
             hideCancelledCheckbox.addEventListener('change', processAndFilterData);
 
-            // 三大動作按鈕
-            btnPrint.addEventListener('click', () => {
-                updatePrintDate();
-                window.print();
-            });
-
+            btnPrint.addEventListener('click', () => window.print());
             btnExportPdf.addEventListener('click', exportToSinglePagePDF);
             btnExportExcel.addEventListener('click', exportCleanExcel);
             btnLoadSample.addEventListener('click', loadSampleData);
@@ -506,7 +477,6 @@
 
             filteredData = list;
             loadedFileMeta.textContent = `共 ${rawData.length} 筆 (呈現 ${filteredData.length} 筆)`;
-            printCountSpan.textContent = filteredData.length;
 
             renderTable();
         }
@@ -559,7 +529,7 @@
                     if (colId === '領料品項名稱') {
                         td.classList.add('text-left', 'font-medium');
                     } else if (colId === '單位簽收人/日期') {
-                        td.classList.add('text-center', 'min-w-[90px]');
+                        td.classList.add('text-center', 'min-w-[95px]');
                     } else if (colId.includes('數量') || colId === '單位') {
                         td.classList.add('text-center', 'font-semibold');
                     } else {
@@ -573,7 +543,7 @@
             });
         }
 
-        // --- 核心：匯出單頁橫式 A4 PDF ---
+        // --- 核心：匯出單頁橫式 A4 PDF (字體最大化) ---
         async function exportToSinglePagePDF() {
             if (!filteredData || filteredData.length === 0) {
                 alert('無可匯出之資料');
@@ -583,15 +553,11 @@
             btnExportPdf.disabled = true;
             btnExportPdf.innerHTML = '<span>⏳</span> 產生單頁 PDF 中...';
 
-            updatePrintDate();
-
-            // 複製列印節點進行高密度單頁排版
             const printElement = document.getElementById('print-area');
             const clone = printElement.cloneNode(true);
 
-            // 設定為標準 A4 橫式像素寬度 (~1120px)
-            clone.style.width = '1110px';
-            clone.style.padding = '8px 12px';
+            clone.style.width = '1120px';
+            clone.style.padding = '8px 10px';
             clone.style.margin = '0';
             clone.style.backgroundColor = '#ffffff';
             clone.style.position = 'fixed';
@@ -600,47 +566,38 @@
             clone.style.boxSizing = 'border-box';
             document.body.appendChild(clone);
 
-            // 依列數動態壓縮字級與行高，確保「剛好容納於一張 A4」
             const rowCount = filteredData.length;
-            let fontSize = '8.5px';
+            // 字體放大最佳化
+            let fontSize = '9.5px';
             let cellPadding = '2.5px 3px';
-            let titleMargin = '6px';
-            let sigMargin = '10px';
 
-            if (rowCount > 30) {
-                fontSize = '7px';
-                cellPadding = '1.2px 2px';
-                titleMargin = '3px';
-                sigMargin = '6px';
-            } else if (rowCount > 20) {
+            if (rowCount > 32) {
                 fontSize = '7.5px';
+                cellPadding = '1.2px 2px';
+            } else if (rowCount > 25) {
+                fontSize = '8.2px';
                 cellPadding = '1.8px 2.5px';
-                titleMargin = '4px';
-                sigMargin = '8px';
             }
 
             clone.querySelectorAll('th, td').forEach(cell => {
                 cell.style.fontSize = fontSize;
                 cell.style.padding = cellPadding;
-                cell.style.lineHeight = '1.15';
+                cell.style.lineHeight = '1.18';
             });
-
-            const titleHeader = clone.querySelector('.border-b-2');
-            if (titleHeader) titleHeader.style.paddingBottom = '3px';
 
             const sigBlock = clone.querySelector('.signature-block');
             if (sigBlock) {
-                sigBlock.style.marginTop = sigMargin;
+                sigBlock.style.marginTop = '10px';
                 sigBlock.style.paddingTop = '6px';
-                sigBlock.style.fontSize = '9px';
+                sigBlock.style.fontSize = '9.5px';
             }
 
             const now = new Date();
             const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
 
             const opt = {
-                margin: [4, 5, 4, 5],
-                filename: `藥品材料申請單_主管正確格式_A4單頁橫式_${dateStr}.pdf`,
+                margin: [3, 4, 3, 4],
+                filename: `藥品材料申請單_A4單頁橫式_${dateStr}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { 
                     scale: 2.5, 

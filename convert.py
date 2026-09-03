@@ -2,14 +2,16 @@
 # -*- coding: utf-8 -*-
 """
 藥劑科小藥撥補單 - 主管格式轉換器 (Excel + A4 單頁橫式 PDF)
-讀取系統匯出的 23 欄 Excel，自動過濾並產出：
-1. 主管要求的 14 欄標準格式 Excel (含「單位簽收人/日期」)
-2. 剛好容納於 1 張 A4 的橫式 PDF 報表 (高品質繁體中文、標準格線與簽核區)
+依需求客製化：
+1. 移除日期/筆數等副標題文字
+2. 移除「製表人」
+3. 「發料藥佐/藥師」改為「發料藥佐」
+4. 新增「核對藥師」簽名欄位
+5. 字體最大化（7.5pt），全表嚴格容納於 1 張 A4 橫式紙張
 """
 
 import sys
 import os
-import datetime
 import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -36,10 +38,9 @@ for fpath in CHINESE_FONT_PATHS:
             pdfmetrics.registerFont(TTFont('Chinese', fpath))
             FONT_REGISTERED = True
             break
-        except Exception as e:
+        except Exception:
             continue
 
-# 主管要求的標準欄位對應表
 TARGET_COLUMN_MAP = [
     ('申請單號', '申請單號'),
     ('申請時間', '申請時間'),
@@ -133,68 +134,53 @@ def generate_single_page_pdf(headers, rows, dest_pdf):
         print("未偵測到可用中文字型，略過 PDF 產出")
         return
 
-    page_width, page_height = landscape(A4)
-    margin = 15
-    printable_width = page_width - margin * 2 # 811.89 pt
-
+    margin = 8
     doc = SimpleDocTemplate(
         dest_pdf,
         pagesize=landscape(A4),
         leftMargin=margin,
         rightMargin=margin,
-        topMargin=margin,
-        bottomMargin=margin
+        topMargin=8,
+        bottomMargin=8
     )
 
     row_count = len(rows)
-    # 動態最適化字級與間距，確保 100% 符合單頁 A4 橫式
-    if row_count > 30:
-        font_size = 6.0
-        leading = 7.0
-        padding = 1.0
-    elif row_count > 20:
-        font_size = 6.5
-        leading = 7.5
-        padding = 1.2
-    else:
+    # 動態字級最適化（最大化字體）
+    if row_count > 32:
+        font_size = 7.0
+        leading = 8.0
+        padding = 0.8
+    elif row_count > 25:
         font_size = 7.5
         leading = 8.5
-        padding = 2.0
+        padding = 1.0
+    else:
+        font_size = 8.2
+        leading = 9.5
+        padding = 1.6
 
     title_style = ParagraphStyle(
         'TitleStyle',
         fontName='Chinese',
-        fontSize=13,
+        fontSize=14,
         leading=16,
         alignment=1,
         textColor=colors.HexColor('#0f172a')
     )
 
-    sub_style = ParagraphStyle(
-        'SubStyle',
-        fontName='Chinese',
-        fontSize=7.5,
-        leading=10,
-        alignment=0,
-        textColor=colors.HexColor('#475569')
-    )
-
-    now_str = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
     elements = [
         Paragraph('<b>佳里奇美醫院 藥劑科小藥撥補單</b>', title_style),
-        Spacer(1, 3),
-        Paragraph(f'列印日期：{now_str} ｜ 資料筆數：{row_count} 筆 ｜ 格式：主管標準格式 (含單位簽收人/日期)', sub_style),
         Spacer(1, 4)
     ]
 
-    col_widths = [48, 65, 45, 45, 38, 38, 45, 45, 130, 80, 28, 35, 35, 115]
+    col_widths = [48, 78, 42, 52, 34, 34, 52, 42, 145, 78, 24, 32, 32, 132]
 
     table_data = []
     header_cells = []
     for h in headers:
         header_cells.append(Paragraph(
             f'<b>{h.replace(chr(10), "<br/>")}</b>',
-            ParagraphStyle('TH', fontName='Chinese', fontSize=font_size + 0.5, leading=leading + 1, alignment=1)
+            ParagraphStyle('TH', fontName='Chinese', fontSize=font_size, leading=leading, alignment=1)
         ))
     table_data.append(header_cells)
 
@@ -212,22 +198,23 @@ def generate_single_page_pdf(headers, rows, dest_pdf):
     t = Table(table_data, colWidths=col_widths, repeatRows=1)
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f1f5f9')),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#64748b')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#475569')),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('TOPPADDING', (0,0), (-1,-1), padding),
         ('BOTTOMPADDING', (0,0), (-1,-1), padding),
-        ('LEFTPADDING', (0,0), (-1,-1), 2),
-        ('RIGHTPADDING', (0,0), (-1,-1), 2),
+        ('LEFTPADDING', (0,0), (-1,-1), 1.5),
+        ('RIGHTPADDING', (0,0), (-1,-1), 1.5),
     ]))
     elements.append(t)
     elements.append(Spacer(1, 6))
 
+    # 底端簽核欄位（移除製表人、發料藥佐、新增核對藥師、領料單位簽收）
     sig_data = [[
-        Paragraph('製表人：__________________', ParagraphStyle('S1', fontName='Chinese', fontSize=7.5)),
-        Paragraph('發料藥佐/藥師：__________________', ParagraphStyle('S2', fontName='Chinese', fontSize=7.5, alignment=1)),
-        Paragraph('領料單位簽收：__________________', ParagraphStyle('S3', fontName='Chinese', fontSize=7.5, alignment=2))
+        Paragraph('發料藥佐：_______________________', ParagraphStyle('S1', fontName='Chinese', fontSize=9, alignment=0)),
+        Paragraph('核對藥師：_______________________', ParagraphStyle('S2', fontName='Chinese', fontSize=9, alignment=1)),
+        Paragraph('領料單位簽收：_______________________', ParagraphStyle('S3', fontName='Chinese', fontSize=9, alignment=2))
     ]]
-    t_sig = Table(sig_data, colWidths=[250, 300, 260])
+    t_sig = Table(sig_data, colWidths=[275, 275, 275])
     t_sig.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('LEFTPADDING', (0,0), (-1,-1), 0),
