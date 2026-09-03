@@ -172,7 +172,8 @@ def generate_single_page_pdf(headers, rows, dest_pdf):
         Spacer(1, 4)
     ]
 
-    col_widths = [48, 80, 40, 50, 34, 34, 52, 42, 145, 78, 24, 32, 32, 134]
+    col_widths = [48, 78, 40, 50, 34, 34, 50, 40, 140, 86, 26, 32, 32, 134]
+
 
     table_data = []
     header_cells = []
