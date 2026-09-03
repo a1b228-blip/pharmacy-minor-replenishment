@@ -24,4 +24,5 @@
 ## 🕐 最後更新
 - 時間：2026-09-04 00:47
 - 更新者：Antigravity @ jiangruiyideMacBook-Air.local
-- Git push：待推
+- Git push：✅ 已推（線上網址：https://a1b228-blip.github.io/pharmacy-minor-replenishment/）
+
