@@ -483,19 +483,19 @@
 
         const COL_PERCENTAGES = {
             '申請單號': '7.5%',
-            '申請時間': '9.5%',
-            '申請單位': '5.5%',
+            '申請時間': '10.0%',
+            '申請單位': '5.0%',
             '費用部門代號': '5.5%',
             '申請人': '4.5%',
             '送簽主管': '4.5%',
             '實際簽核主管': '5.5%',
             '發料日期': '5.5%',
             '領料品項名稱': '20.0%',
-            '材料編號': '11.0%',
+            '材料編號': '11.5%',
             '單位': '3.5%',
             '申請數量': '4.0%',
             '發料數量': '4.0%',
-            '單位簽收人/日期': '9.5%'
+            '單位簽收人/日期': '9.0%'
         };
 
         function renderTable() {
@@ -577,8 +577,8 @@
                     } else if (colId === '材料編號') {
                         td.style.textAlign = 'center';
                         td.style.fontFamily = 'monospace';
-                        td.style.fontSize = '8.5px';
-                        td.style.whiteSpace = 'nowrap'; // 嚴格禁止溢出或折行
+                        td.style.fontSize = '8.2px';
+                        td.style.whiteSpace = 'nowrap';
                     } else if (colId === '單位簽收人/日期') {
                         td.style.textAlign = 'center';
                     } else if (colId.includes('數量') || colId === '單位') {
@@ -598,7 +598,7 @@
             });
         }
 
-        // --- 核心：匯出單頁橫式 A4 PDF (文字不溢出、嚴格容納於 1 頁 A4) ---
+        // --- 核心：匯出單頁橫式 A4 PDF (文字不裁切、不溢出、嚴格 1 頁 A4) ---
         async function exportToSinglePagePDF() {
             if (!filteredData || filteredData.length === 0) {
                 alert('無可匯出之資料');
@@ -638,100 +638,163 @@
                     return;
                 }
             } catch (err) {
-                console.log("切換至純前端單頁鎖定渲染引擎...");
+                // 靜態環境（如 GitHub Pages）切換至前端渲染引擎
             }
 
-            // 2. 純前端單頁橫式 A4 嚴格縮放容器 (確保 100% 不跨頁、不跑版)
-            const printElement = document.getElementById('print-area');
-            const clone = printElement.cloneNode(true);
+            // 2. 前端專用乾淨容器 (完全不受網頁滾動、螢幕解析度干擾，確保左右零裁切且完整單頁)
+            const container = document.createElement('div');
+            container.style.width = '1060px';
+            container.style.backgroundColor = '#ffffff';
+            container.style.boxSizing = 'border-box';
+            container.style.padding = '8px 10px';
+            container.style.margin = '0';
+            container.style.position = 'fixed';
+            container.style.left = '0';
+            container.style.top = '0';
+            container.style.zIndex = '999999';
+            container.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", "Microsoft JhengHei", sans-serif';
 
-            // A4 橫式精確比例 (1122px x 780px)
-            clone.style.width = '1122px';
-            clone.style.height = '780px';
-            clone.style.maxHeight = '780px';
-            clone.style.boxSizing = 'border-box';
-            clone.style.padding = '8px 12px';
-            clone.style.backgroundColor = '#ffffff';
-            clone.style.position = 'fixed';
-            clone.style.top = '0';
-            clone.style.left = '0';
-            clone.style.zIndex = '99999';
-            clone.style.overflow = 'hidden';
-            clone.style.display = 'flex';
-            clone.style.flexDirection = 'column';
-            clone.style.justifyContent = 'space-between';
+            // 標題
+            const titleDiv = document.createElement('div');
+            titleDiv.style.textAlign = 'center';
+            titleDiv.style.paddingBottom = '6px';
+            titleDiv.style.marginBottom = '6px';
+            titleDiv.style.borderBottom = '1px solid #cbd5e1';
+            titleDiv.innerHTML = '<h2 style="margin:0; padding:0; font-size: 16px; font-weight: 800; color: #0f172a; letter-spacing: 1px;">佳里奇美醫院 藥劑科小藥撥補單</h2>';
+            container.appendChild(titleDiv);
 
-            // 依照筆數動態設定最清晰字級
-            const rowCount = filteredData.length;
-            let cellFontSize = '9.5px';
-            let cellPadding = '2px 2.5px';
+            // 表格
+            const table = document.createElement('table');
+            table.style.width = '100%';
+            table.style.tableLayout = 'fixed';
+            table.style.borderCollapse = 'collapse';
+            table.style.margin = '0';
+            table.style.boxSizing = 'border-box';
 
-            if (rowCount > 30) {
-                cellFontSize = '7.5px';
-                cellPadding = '1px 2px';
-            } else if (rowCount > 24) {
-                cellFontSize = '8.5px';
-                cellPadding = '1.5px 2px';
-            }
+            // 固定欄寬 colgroup
+            const colgroup = document.createElement('colgroup');
+            selectedColumns.forEach(colId => {
+                const col = document.createElement('col');
+                col.style.width = COL_PERCENTAGES[colId] || '7%';
+                colgroup.appendChild(col);
+            });
+            table.appendChild(colgroup);
 
-            clone.querySelectorAll('th').forEach(th => {
-                th.style.fontSize = cellFontSize;
-                th.style.padding = cellPadding;
+            // 表頭
+            const thead = document.createElement('thead');
+            const thRow = document.createElement('tr');
+            thRow.style.backgroundColor = '#f1f5f9';
+
+            selectedColumns.forEach(colId => {
+                const th = document.createElement('th');
+                const colDef = ALL_COLUMNS.find(c => c.id === colId);
+                th.innerHTML = (colDef ? colDef.name : colId).replace(/\n/g, '<br/>');
                 th.style.border = '0.8px solid #334155';
+                th.style.padding = '3px 2px';
+                th.style.fontSize = '9.2px';
+                th.style.lineHeight = '1.15';
+                th.style.textAlign = 'center';
+                th.style.fontWeight = 'bold';
+                th.style.color = '#0f172a';
+                th.style.boxSizing = 'border-box';
+                th.style.overflow = 'hidden';
+                thRow.appendChild(th);
             });
+            thead.appendChild(thRow);
+            table.appendChild(thead);
 
-            clone.querySelectorAll('td').forEach(td => {
-                td.style.fontSize = cellFontSize;
-                td.style.padding = cellPadding;
-                td.style.border = '0.8px solid #334155';
+            // 表身 (動態最適字級：28筆資料時 8.6px，內距 1.5px 2px)
+            const tbody = document.createElement('tbody');
+            const rowCount = filteredData.length;
+            const dataFontSize = rowCount > 30 ? '7.5px' : (rowCount > 24 ? '8.6px' : '9.2px');
+            const dataPadding = rowCount > 30 ? '1px 1.5px' : '1.5px 2px';
+
+            filteredData.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                tr.style.backgroundColor = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+
+                selectedColumns.forEach(colId => {
+                    const td = document.createElement('td');
+                    let val = row[colId] ?? '';
+                    if (val instanceof Date) {
+                        val = val.toLocaleString('zh-TW', { hour12: false });
+                    }
+
+                    td.textContent = val;
+                    td.style.border = '0.8px solid #334155';
+                    td.style.padding = dataPadding;
+                    td.style.fontSize = dataFontSize;
+                    td.style.lineHeight = '1.15';
+                    td.style.boxSizing = 'border-box';
+                    td.style.overflow = 'hidden';
+
+                    if (colId === '領料品項名稱') {
+                        td.style.textAlign = 'left';
+                        td.style.fontWeight = '500';
+                        td.style.whiteSpace = 'normal';
+                        td.style.wordBreak = 'break-all';
+                    } else if (colId === '材料編號') {
+                        td.style.textAlign = 'center';
+                        td.style.fontFamily = 'monospace';
+                        td.style.fontSize = '8.2px';
+                        td.style.whiteSpace = 'nowrap';
+                    } else if (colId.includes('數量') || colId === '單位') {
+                        td.style.textAlign = 'center';
+                        td.style.fontWeight = '600';
+                        td.style.whiteSpace = 'nowrap';
+                    } else {
+                        td.style.textAlign = 'center';
+                        td.style.whiteSpace = 'nowrap';
+                    }
+
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
             });
+            table.appendChild(tbody);
+            container.appendChild(table);
 
-            // 標題與簽名微調
-            const titleBlock = clone.querySelector('h2');
-            if (titleBlock) titleBlock.style.fontSize = '16px';
+            // 簽核區 (靠右放，發料藥佐與核對藥師)
+            const sigDiv = document.createElement('div');
+            sigDiv.style.display = 'flex';
+            sigDiv.style.justifyContent = 'flex-end';
+            sigDiv.style.gap = '36px';
+            sigDiv.style.marginTop = '8px';
+            sigDiv.style.paddingTop = '4px';
+            sigDiv.style.fontSize = '9.5px';
+            sigDiv.style.fontWeight = '600';
+            sigDiv.style.color = '#1e293b';
+            sigDiv.innerHTML = '<div>發料藥佐：____________________</div><div>核對藥師：____________________</div>';
+            container.appendChild(sigDiv);
 
-            const sigBlock = clone.querySelector('.signature-block');
-            if (sigBlock) {
-                sigBlock.style.marginTop = '6px';
-                sigBlock.style.fontSize = '9.5px';
-                sigBlock.style.display = 'flex';
-                sigBlock.style.justifyContent = 'flex-end';
-                sigBlock.style.gap = '36px';
-            }
-
-            document.body.appendChild(clone);
+            document.body.appendChild(container);
 
             const opt = {
-                margin: 0,
+                margin: [5, 6, 5, 6], // 上下 5mm，左右 6mm 保證完全不裁切且完美置中
                 filename: pdfFilename,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { 
                     scale: 2, 
                     useCORS: true, 
                     logging: false,
-                    backgroundColor: '#ffffff',
-                    width: 1122,
-                    height: 780,
-                    windowWidth: 1122,
-                    windowHeight: 780,
-                    scrollX: 0,
-                    scrollY: 0
+                    backgroundColor: '#ffffff'
                 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
                 pagebreak: { mode: 'avoid-all' }
             };
 
             try {
-                await html2pdf().set(opt).from(clone).save();
+                await html2pdf().set(opt).from(container).save();
             } catch (err) {
                 console.error("PDF 產出失敗:", err);
-                alert("PDF 產出失敗，請改用「列印預覽 (A4 橫向)」按鈕並在列印視窗選擇「另存為 PDF」。");
+                alert("PDF 產出失敗，請改用「列印預覽 (A4 橫向)」並在列印視窗選擇「另存為 PDF」。");
             } finally {
-                document.body.removeChild(clone);
+                document.body.removeChild(container);
                 btnExportPdf.disabled = false;
                 btnExportPdf.innerHTML = '<span>📄</span> 匯出單頁橫式 PDF (A4 最適化)';
             }
         }
+
 
 
 
