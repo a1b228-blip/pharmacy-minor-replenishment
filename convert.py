@@ -1,17 +1,45 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-藥劑科小藥撥補單 - 主管格式轉換器
-讀取系統匯出的 23 欄 Excel，自動過濾並產出主管要求的 14 欄標準格式（含「單位簽收人/日期」）。
+藥劑科小藥撥補單 - 主管格式轉換器 (Excel + A4 單頁橫式 PDF)
+讀取系統匯出的 23 欄 Excel，自動過濾並產出：
+1. 主管要求的 14 欄標準格式 Excel (含「單位簽收人/日期」)
+2. 剛好容納於 1 張 A4 的橫式 PDF 報表 (高品質繁體中文、標準格線與簽核區)
 """
 
 import sys
 import os
+import datetime
 import openpyxl
 from openpyxl.styles import Font, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-# 主管要求的標準欄位對應表 (來源欄位名 -> 目標表頭文字)
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+
+# 註冊中文字型
+CHINESE_FONT_PATHS = [
+    '/Library/Fonts/Arial Unicode.ttf',
+    '/System/Library/Fonts/Supplemental/Songti.ttc',
+    '/System/Library/Fonts/STHeiti Light.ttc',
+    '/System/Library/Fonts/Hiragino Sans GB.ttc'
+]
+
+FONT_REGISTERED = False
+for fpath in CHINESE_FONT_PATHS:
+    if os.path.exists(fpath):
+        try:
+            pdfmetrics.registerFont(TTFont('Chinese', fpath))
+            FONT_REGISTERED = True
+            break
+        except Exception as e:
+            continue
+
+# 主管要求的標準欄位對應表
 TARGET_COLUMN_MAP = [
     ('申請單號', '申請單號'),
     ('申請時間', '申請時間'),
@@ -26,60 +54,30 @@ TARGET_COLUMN_MAP = [
     ('單位', '單位'),
     ('申請數量', '申請\n數量'),
     ('發料數量', '發料\n數量'),
-    (None, '單位簽收人/日期') # 新增欄位，初始為空
+    (None, '單位簽收人/日期')
 ]
 
-# 建議欄寬設定 (對照主管 Excel 範本比例)
 COLUMN_WIDTHS = {
-    1: 14,   # 申請單號
-    2: 20,   # 申請時間
-    3: 11,   # 申請單位
-    4: 13,   # 費用部門代號
-    5: 10,   # 申請人
-    6: 10,   # 送簽主管
-    7: 13,   # 實際簽核主管
-    8: 12,   # 發料日期
-    9: 28,   # 領料品項名稱
-    10: 16,  # 材料編號
-    11: 8,   # 單位
-    12: 10,  # 申請數量
-    13: 10,  # 發料數量
-    14: 18   # 單位簽收人/日期
+    1: 14, 2: 20, 3: 11, 4: 13, 5: 10, 6: 10, 7: 13,
+    8: 12, 9: 28, 10: 16, 11: 8, 12: 10, 13: 10, 14: 18
 }
 
-def convert_replenishment_excel(src_path, dest_path=None):
-    if not os.path.exists(src_path):
-        print(f"錯誤：找不到檔案 {src_path}")
-        return None
-
-    if dest_path is None:
-        base, ext = os.path.splitext(src_path)
-        dest_path = f"{base}_正確格式.xlsx"
-
-    print(f"正在讀取：{src_path}")
+def generate_excel(src_path, dest_xlsx):
     src_wb = openpyxl.load_workbook(src_path)
     src_ws = src_wb.active
-
-    # 讀取來源表頭並建立索引對應
     src_headers = [cell.value for cell in src_ws[1]]
+
     col_mapping = []
     for src_col, target_header in TARGET_COLUMN_MAP:
-        if src_col is not None:
-            if src_col in src_headers:
-                col_mapping.append((src_headers.index(src_col), target_header))
-            else:
-                print(f"警告：來源資料缺少欄位「{src_col}」，將填空值")
-                col_mapping.append((None, target_header))
+        if src_col is not None and src_col in src_headers:
+            col_mapping.append((src_headers.index(src_col), target_header))
         else:
-            # 額外新增的欄位
             col_mapping.append((None, target_header))
 
-    # 建立目標活頁簿
     dest_wb = openpyxl.Workbook()
     dest_ws = dest_wb.active
     dest_ws.title = "藥品材料申請單"
 
-    # 樣式定義
     font_header = Font(name="新細明體", size=11, bold=True)
     font_data = Font(name="新細明體", size=10, bold=False)
     align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -92,7 +90,6 @@ def convert_replenishment_excel(src_path, dest_path=None):
         bottom=Side(style='thin', color='A0A0A0')
     )
 
-    # 寫入表頭 (第 1 列)
     dest_ws.row_dimensions[1].height = 28
     for col_idx, (_, target_header) in enumerate(col_mapping, start=1):
         cell = dest_ws.cell(row=1, column=col_idx, value=target_header)
@@ -100,29 +97,27 @@ def convert_replenishment_excel(src_path, dest_path=None):
         cell.alignment = align_center
         cell.border = thin_border
 
-    # 寫入資料列 (第 2 列起)
+    extracted_rows = []
     for row_idx, src_row in enumerate(src_ws.iter_rows(min_row=2, values_only=True), start=2):
         dest_ws.row_dimensions[row_idx].height = 24
+        curr_row = []
         for col_idx, (src_idx, target_header) in enumerate(col_mapping, start=1):
             val = src_row[src_idx] if src_idx is not None else ""
-            if val is None:
-                val = ""
+            if val is None: val = ""
             cell = dest_ws.cell(row=row_idx, column=col_idx, value=val)
             cell.font = font_data
             cell.border = thin_border
-            
-            # 品項名稱偏左對齊，其餘欄位置中
             if '品項名稱' in target_header:
                 cell.alignment = align_left
             else:
                 cell.alignment = align_center
+            curr_row.append(val)
+        extracted_rows.append(curr_row)
 
-    # 設定欄寬
     for col_idx, width in COLUMN_WIDTHS.items():
         col_letter = get_column_letter(col_idx)
         dest_ws.column_dimensions[col_letter].width = width
 
-    # 列印設定：A4 橫向、自動符合寬度
     dest_ws.page_setup.orientation = dest_ws.ORIENTATION_LANDSCAPE
     dest_ws.page_setup.paperSize = dest_ws.PAPERSIZE_A4
     dest_ws.page_setup.fitToPage = True
@@ -130,11 +125,134 @@ def convert_replenishment_excel(src_path, dest_path=None):
     dest_ws.page_setup.fitToHeight = 0
     dest_ws.sheet_properties.pageSetUpPr.fitToPage = True
 
-    # 儲存
-    dest_wb.save(dest_path)
-    print(f"✅ 成功產出正確格式檔案：{dest_path}")
-    return dest_path
+    dest_wb.save(dest_xlsx)
+    return [h for _, h in col_mapping], extracted_rows
+
+def generate_single_page_pdf(headers, rows, dest_pdf):
+    if not FONT_REGISTERED:
+        print("未偵測到可用中文字型，略過 PDF 產出")
+        return
+
+    page_width, page_height = landscape(A4)
+    margin = 15
+    printable_width = page_width - margin * 2 # 811.89 pt
+
+    doc = SimpleDocTemplate(
+        dest_pdf,
+        pagesize=landscape(A4),
+        leftMargin=margin,
+        rightMargin=margin,
+        topMargin=margin,
+        bottomMargin=margin
+    )
+
+    row_count = len(rows)
+    # 動態最適化字級與間距，確保 100% 符合單頁 A4 橫式
+    if row_count > 30:
+        font_size = 6.0
+        leading = 7.0
+        padding = 1.0
+    elif row_count > 20:
+        font_size = 6.5
+        leading = 7.5
+        padding = 1.2
+    else:
+        font_size = 7.5
+        leading = 8.5
+        padding = 2.0
+
+    title_style = ParagraphStyle(
+        'TitleStyle',
+        fontName='Chinese',
+        fontSize=13,
+        leading=16,
+        alignment=1,
+        textColor=colors.HexColor('#0f172a')
+    )
+
+    sub_style = ParagraphStyle(
+        'SubStyle',
+        fontName='Chinese',
+        fontSize=7.5,
+        leading=10,
+        alignment=0,
+        textColor=colors.HexColor('#475569')
+    )
+
+    now_str = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    elements = [
+        Paragraph('<b>佳里奇美醫院 藥劑科小藥撥補單</b>', title_style),
+        Spacer(1, 3),
+        Paragraph(f'列印日期：{now_str} ｜ 資料筆數：{row_count} 筆 ｜ 格式：主管標準格式 (含單位簽收人/日期)', sub_style),
+        Spacer(1, 4)
+    ]
+
+    col_widths = [48, 65, 45, 45, 38, 38, 45, 45, 130, 80, 28, 35, 35, 115]
+
+    table_data = []
+    header_cells = []
+    for h in headers:
+        header_cells.append(Paragraph(
+            f'<b>{h.replace(chr(10), "<br/>")}</b>',
+            ParagraphStyle('TH', fontName='Chinese', fontSize=font_size + 0.5, leading=leading + 1, alignment=1)
+        ))
+    table_data.append(header_cells)
+
+    for r in rows:
+        row_cells = []
+        for i, val in enumerate(r):
+            v_str = str(val or '')
+            align = 0 if i == 8 else 1
+            row_cells.append(Paragraph(
+                v_str,
+                ParagraphStyle('TD', fontName='Chinese', fontSize=font_size, leading=leading, alignment=align)
+            ))
+        table_data.append(row_cells)
+
+    t = Table(table_data, colWidths=col_widths, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f1f5f9')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#64748b')),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), padding),
+        ('BOTTOMPADDING', (0,0), (-1,-1), padding),
+        ('LEFTPADDING', (0,0), (-1,-1), 2),
+        ('RIGHTPADDING', (0,0), (-1,-1), 2),
+    ]))
+    elements.append(t)
+    elements.append(Spacer(1, 6))
+
+    sig_data = [[
+        Paragraph('製表人：__________________', ParagraphStyle('S1', fontName='Chinese', fontSize=7.5)),
+        Paragraph('發料藥佐/藥師：__________________', ParagraphStyle('S2', fontName='Chinese', fontSize=7.5, alignment=1)),
+        Paragraph('領料單位簽收：__________________', ParagraphStyle('S3', fontName='Chinese', fontSize=7.5, alignment=2))
+    ]]
+    t_sig = Table(sig_data, colWidths=[250, 300, 260])
+    t_sig.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('LEFTPADDING', (0,0), (-1,-1), 0),
+        ('RIGHTPADDING', (0,0), (-1,-1), 0),
+    ]))
+    elements.append(t_sig)
+
+    doc.build(elements)
+
+def convert_replenishment_excel(src_path):
+    if not os.path.exists(src_path):
+        print(f"錯誤：找不到檔案 {src_path}")
+        return
+
+    base, _ = os.path.splitext(src_path)
+    dest_xlsx = f"{base}_正確格式.xlsx"
+    dest_pdf = f"{base}_單頁橫式.pdf"
+
+    print(f"正在讀取：{src_path}")
+    headers, rows = generate_excel(src_path, dest_xlsx)
+    print(f"✅ 成功產出 Excel：{dest_xlsx}")
+
+    generate_single_page_pdf(headers, rows, dest_pdf)
+    print(f"✅ 成功產出 A4 單頁橫式 PDF：{dest_pdf}")
 
 if __name__ == '__main__':
-    target_file = sys.argv[1] if len(sys.argv) > 1 else '/Users/jiangruiyi/Downloads/藥品材料申請單_2026-08-27_to_2026-09-02.xlsx'
-    convert_replenishment_excel(target_file)
+    target = sys.argv[1] if len(sys.argv) > 1 else '/Users/jiangruiyi/Downloads/藥品材料申請單_2026-08-27_to_2026-09-02.xlsx'
+    convert_replenishment_excel(target)

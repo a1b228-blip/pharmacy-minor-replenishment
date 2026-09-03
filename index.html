@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- SheetJS (Excel 解析與匯出函式庫) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- html2pdf.js (高畫質 PDF 匯出函式庫) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
@@ -24,7 +26,7 @@
         /* 螢幕預覽表格樣式 */
         .preview-table th, .preview-table td {
             border: 1px solid #cbd5e1;
-            padding: 6px 8px;
+            padding: 4px 6px;
             font-size: 11px;
             vertical-align: middle;
         }
@@ -36,22 +38,25 @@
             white-space: pre-line;
         }
 
-        /* 列印專用樣式 (@media print) */
+        /* 列印專用樣式 (@media print) - 強制一張 A4 橫向最適化 */
         @media print {
             @page {
                 size: A4 landscape;
-                margin: 8mm 6mm 8mm 6mm;
+                margin: 5mm 5mm 5mm 5mm;
             }
 
             .no-print, header, nav, .upload-section, .controls-section, .action-buttons, footer {
                 display: none !important;
             }
 
-            body {
+            html, body {
                 background: white !important;
                 color: black !important;
                 padding: 0 !important;
                 margin: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                overflow: hidden !important;
             }
 
             #print-area {
@@ -66,13 +71,14 @@
             .print-table {
                 width: 100% !important;
                 border-collapse: collapse !important;
-                font-size: 8.5pt !important;
+                font-size: 7.5pt !important;
+                line-height: 1.15 !important;
                 table-layout: auto !important;
             }
 
             .print-table th, .print-table td {
-                border: 1px solid #334155 !important;
-                padding: 4px 4px !important;
+                border: 0.8px solid #334155 !important;
+                padding: 2.5px 3px !important;
                 color: black !important;
                 background: transparent !important;
             }
@@ -95,10 +101,10 @@
             }
 
             .signature-block {
-                margin-top: 16px !important;
+                margin-top: 10px !important;
                 display: flex !important;
                 justify-content: space-between !important;
-                font-size: 9.5pt !important;
+                font-size: 8.5pt !important;
                 font-weight: 600 !important;
                 page-break-inside: avoid !important;
             }
@@ -117,7 +123,7 @@
                 </div>
                 <div>
                     <h1 class="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">佳里奇美醫院 藥劑科小藥撥補單列印助手</h1>
-                    <p class="text-xs text-gray-500 mt-0.5">自動轉為主管要求標準格式（含「單位簽收人/日期」） • A4 橫向最適列印 • 精簡 Excel 一鍵匯出</p>
+                    <p class="text-xs text-gray-500 mt-0.5">主管 14 欄標準格式（含「單位簽收人/日期」） • <strong>一鍵匯出單頁橫式 A4 PDF</strong> • 精簡 Excel 下載</p>
                 </div>
             </div>
             <div class="flex items-center gap-2">
@@ -160,7 +166,7 @@
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100 pb-3">
                 <div class="flex items-center gap-2">
                     <h3 class="font-bold text-gray-800 text-sm sm:text-base">⚙️ 欄位管理與設定</h3>
-                    <span class="text-xs text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">已自動套用主管要求 14 欄標準格式</span>
+                    <span class="text-xs text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">已自動套用主管 14 欄標準格式</span>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <button id="preset-target-btn" class="px-3 py-1.5 text-xs font-semibold bg-teal-700 text-white hover:bg-teal-800 rounded-md transition shadow-sm">
@@ -180,7 +186,7 @@
                 <!-- 由 JavaScript 自動產生欄位開關 -->
             </div>
 
-            <!-- 篩選與動作按鈕列 -->
+            <!-- 動作按鈕列 -->
             <div class="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-gray-100">
                 <div class="flex items-center gap-4 text-xs sm:text-sm text-gray-600">
                     <label class="flex items-center gap-1.5 cursor-pointer">
@@ -189,32 +195,35 @@
                     </label>
                 </div>
 
-                <!-- 動作按鈕組 -->
-                <div class="flex items-center gap-3">
-                    <button id="btn-export-excel" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition">
-                        <span>📥</span> 匯出主管正確格式 Excel
+                <!-- 動作按鈕組 (三大匯出模式) -->
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <button id="btn-export-excel" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-sm transition">
+                        <span>📥</span> 匯出主管格式 Excel
                     </button>
-                    <button id="btn-print" class="inline-flex items-center gap-1.5 px-5 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition">
-                        <span>🖨️</span> 列印 / 另存 PDF (A4 橫向)
+                    <button id="btn-export-pdf" class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition">
+                        <span>📄</span> 匯出單頁橫式 PDF (A4 最適化)
+                    </button>
+                    <button id="btn-print" class="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md hover:shadow-lg transition">
+                        <span>🖨️</span> 列印預覽 (A4 橫向)
                     </button>
                 </div>
             </div>
         </section>
 
         <!-- 列印與預覽區域 -->
-        <main id="print-area" class="hidden bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+        <main id="print-area" class="hidden bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-gray-200 space-y-3">
             
             <!-- 表頭資訊 -->
-            <div class="border-b-2 border-gray-800 pb-2">
+            <div class="border-b-2 border-gray-800 pb-1.5">
                 <div class="flex justify-between items-end">
                     <div>
-                        <h2 class="text-lg sm:text-xl font-black text-gray-900 tracking-wide">佳里奇美醫院 藥劑科小藥撥補單</h2>
-                        <p class="text-xs text-gray-600 mt-0.5" id="print-meta-summary">
-                            列印日期：<span id="print-date"></span> ｜ 呈現筆數：<span id="print-count">0</span> 筆
+                        <h2 class="text-base sm:text-lg font-black text-gray-900 tracking-wide">佳里奇美醫院 藥劑科小藥撥補單</h2>
+                        <p class="text-[11px] text-gray-600 mt-0.5" id="print-meta-summary">
+                            列印日期：<span id="print-date"></span> ｜ 筆數：<span id="print-count">0</span> 筆 ｜ 格式：主管標準格式 (含單位簽收人/日期)
                         </p>
                     </div>
-                    <div class="text-right text-xs text-teal-800 font-semibold bg-teal-50 px-2 py-1 rounded no-print">
-                        【主管正確格式：含單位簽收人/日期】
+                    <div class="text-right text-[11px] text-teal-800 font-semibold bg-teal-50 px-2 py-0.5 rounded no-print">
+                        【A4 橫式單頁最適化】
                     </div>
                 </div>
             </div>
@@ -232,7 +241,7 @@
             </div>
 
             <!-- 表尾簽核區 -->
-            <div class="signature-block pt-5 border-t border-gray-400 mt-5 flex justify-between text-xs sm:text-sm font-medium text-gray-800">
+            <div class="signature-block pt-3 border-t border-gray-400 mt-3 flex justify-between text-xs font-medium text-gray-800">
                 <div>製表人：____________________</div>
                 <div>發料藥佐 / 藥師：____________________</div>
                 <div>領料單位簽收：____________________</div>
@@ -248,11 +257,6 @@
     </div>
 
     <script>
-        // --- 完整欄位定義（對齊主管正確格式與原系統 23 欄） ---
-        // 主管要的 14 個標準欄位（依序）：
-        // 1. 申請單號, 2. 申請時間, 3. 申請單位, 4. 費用部門代號, 5. 申請人, 6. 送簽主管, 7. 實際簽核主管,
-        // 8. 發料日期, 9. 領料品項名稱, 10. 材料編號, 11. 單位, 12. 申請數量, 13. 發料數量, 14. 單位簽收人/日期 (新增)
-
         const TARGET_FIELDS = [
             '申請單號', '申請時間', '申請單位', '費用部門代號', '申請人', 
             '送簽主管', '實際簽核主管', '發料日期', '領料品項名稱', '材料編號', 
@@ -286,7 +290,7 @@
             { id: '單位簽收人/日期', name: '單位簽收人/日期', defaultSelected: true }
         ];
 
-        const STORAGE_KEY = 'cch_pharmacy_supervisor_cols_v2';
+        const STORAGE_KEY = 'cch_pharmacy_supervisor_cols_v3';
 
         let rawData = [];
         let filteredData = [];
@@ -328,6 +332,7 @@
         const tableBody = document.getElementById('table-body');
         const emptyState = document.getElementById('empty-state');
         const btnPrint = document.getElementById('btn-print');
+        const btnExportPdf = document.getElementById('btn-export-pdf');
         const btnExportExcel = document.getElementById('btn-export-excel');
         const btnLoadSample = document.getElementById('btn-load-sample');
         const printDateSpan = document.getElementById('print-date');
@@ -432,11 +437,13 @@
 
             hideCancelledCheckbox.addEventListener('change', processAndFilterData);
 
+            // 三大動作按鈕
             btnPrint.addEventListener('click', () => {
                 updatePrintDate();
                 window.print();
             });
 
+            btnExportPdf.addEventListener('click', exportToSinglePagePDF);
             btnExportExcel.addEventListener('click', exportCleanExcel);
             btnLoadSample.addEventListener('click', loadSampleData);
         }
@@ -462,7 +469,6 @@
                         return;
                     }
 
-                    // 確保每列都有「單位簽收人/日期」欄位
                     rawData = json.map(r => {
                         if (!('單位簽收人/日期' in r)) {
                             r['單位簽收人/日期'] = '';
@@ -499,7 +505,7 @@
             }
 
             filteredData = list;
-            loadedFileMeta.textContent = `共 ${rawData.length} 筆 (有效呈現 ${filteredData.length} 筆)`;
+            loadedFileMeta.textContent = `共 ${rawData.length} 筆 (呈現 ${filteredData.length} 筆)`;
             printCountSpan.textContent = filteredData.length;
 
             renderTable();
@@ -520,16 +526,15 @@
 
             selectedColumns.forEach(colId => {
                 const th = document.createElement('th');
-                // 對應折行標題
                 const colDef = ALL_COLUMNS.find(c => c.id === colId);
                 th.textContent = colDef ? colDef.name : colId;
                 
                 if (colId === '單位簽收人/日期') {
-                    th.className = "p-2 font-bold text-center w-28 bg-emerald-50 text-emerald-950";
+                    th.className = "p-1.5 font-bold text-center w-28 bg-emerald-50 text-emerald-950";
                 } else if (colId.includes('數量') || colId === '單位') {
-                    th.className = "p-2 font-bold text-center";
+                    th.className = "p-1.5 font-bold text-center";
                 } else {
-                    th.className = "p-2 font-bold text-center";
+                    th.className = "p-1.5 font-bold text-center";
                 }
                 headerRow.appendChild(th);
             });
@@ -549,12 +554,12 @@
                     }
 
                     td.textContent = val;
-                    td.className = "p-1.5";
+                    td.className = "p-1";
 
                     if (colId === '領料品項名稱') {
                         td.classList.add('text-left', 'font-medium');
                     } else if (colId === '單位簽收人/日期') {
-                        td.classList.add('text-center', 'min-w-[100px]');
+                        td.classList.add('text-center', 'min-w-[90px]');
                     } else if (colId.includes('數量') || colId === '單位') {
                         td.classList.add('text-center', 'font-semibold');
                     } else {
@@ -568,14 +573,104 @@
             });
         }
 
-        // 匯出精準主管格式 Excel
+        // --- 核心：匯出單頁橫式 A4 PDF ---
+        async function exportToSinglePagePDF() {
+            if (!filteredData || filteredData.length === 0) {
+                alert('無可匯出之資料');
+                return;
+            }
+
+            btnExportPdf.disabled = true;
+            btnExportPdf.innerHTML = '<span>⏳</span> 產生單頁 PDF 中...';
+
+            updatePrintDate();
+
+            // 複製列印節點進行高密度單頁排版
+            const printElement = document.getElementById('print-area');
+            const clone = printElement.cloneNode(true);
+
+            // 設定為標準 A4 橫式像素寬度 (~1120px)
+            clone.style.width = '1110px';
+            clone.style.padding = '8px 12px';
+            clone.style.margin = '0';
+            clone.style.backgroundColor = '#ffffff';
+            clone.style.position = 'fixed';
+            clone.style.top = '-9999px';
+            clone.style.left = '-9999px';
+            clone.style.boxSizing = 'border-box';
+            document.body.appendChild(clone);
+
+            // 依列數動態壓縮字級與行高，確保「剛好容納於一張 A4」
+            const rowCount = filteredData.length;
+            let fontSize = '8.5px';
+            let cellPadding = '2.5px 3px';
+            let titleMargin = '6px';
+            let sigMargin = '10px';
+
+            if (rowCount > 30) {
+                fontSize = '7px';
+                cellPadding = '1.2px 2px';
+                titleMargin = '3px';
+                sigMargin = '6px';
+            } else if (rowCount > 20) {
+                fontSize = '7.5px';
+                cellPadding = '1.8px 2.5px';
+                titleMargin = '4px';
+                sigMargin = '8px';
+            }
+
+            clone.querySelectorAll('th, td').forEach(cell => {
+                cell.style.fontSize = fontSize;
+                cell.style.padding = cellPadding;
+                cell.style.lineHeight = '1.15';
+            });
+
+            const titleHeader = clone.querySelector('.border-b-2');
+            if (titleHeader) titleHeader.style.paddingBottom = '3px';
+
+            const sigBlock = clone.querySelector('.signature-block');
+            if (sigBlock) {
+                sigBlock.style.marginTop = sigMargin;
+                sigBlock.style.paddingTop = '6px';
+                sigBlock.style.fontSize = '9px';
+            }
+
+            const now = new Date();
+            const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+
+            const opt = {
+                margin: [4, 5, 4, 5],
+                filename: `藥品材料申請單_主管正確格式_A4單頁橫式_${dateStr}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { 
+                    scale: 2.5, 
+                    useCORS: true, 
+                    logging: false,
+                    windowWidth: 1120
+                },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+                pagebreak: { mode: 'avoid-all' }
+            };
+
+            try {
+                await html2pdf().set(opt).from(clone).save();
+            } catch (err) {
+                console.error("PDF 產出失敗:", err);
+                alert("PDF 產出失敗，請改用「列印預覽」另存 PDF。");
+            } finally {
+                document.body.removeChild(clone);
+                btnExportPdf.disabled = false;
+                btnExportPdf.innerHTML = '<span>📄</span> 匯出單頁橫式 PDF (A4 最適化)';
+            }
+        }
+
+        // 匯出主管格式 Excel
         function exportCleanExcel() {
             if (!filteredData || filteredData.length === 0) {
                 alert('無可匯出之資料');
                 return;
             }
 
-            // 表頭文字映射（支援折行如「申請\n單位」）
             const headerMap = {
                 '申請單位': '申請\n單位',
                 '送簽主管': '送簽\n主管',
@@ -594,7 +689,6 @@
 
             const worksheet = XLSX.utils.json_to_sheet(exportList);
 
-            // 設定欄寬 (SheetJS)
             worksheet['!cols'] = selectedColumns.map(colId => {
                 if (colId === '領料品項名稱') return { wch: 28 };
                 if (colId === '申請時間') return { wch: 20 };
