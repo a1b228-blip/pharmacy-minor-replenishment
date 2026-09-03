@@ -144,12 +144,8 @@ def generate_single_page_pdf(headers, rows, dest_pdf):
     )
 
     row_count = len(rows)
-    # 動態字級最適化（8.3pt 最大化清晰字級）
-    if row_count > 32:
-        font_size = 7.2
-        leading = 8.2
-        padding = 1.0
-    elif row_count > 25:
+    # 保持清晰字級，一般筆數（<=28筆）剛好單頁；未來資料量大時自然換至第二頁，表頭自動重複
+    if row_count > 24:
         font_size = 8.3
         leading = 9.4
         padding = 1.2
@@ -157,6 +153,7 @@ def generate_single_page_pdf(headers, rows, dest_pdf):
         font_size = 9.0
         leading = 10.5
         padding = 1.8
+
 
     title_style = ParagraphStyle(
         'TitleStyle',

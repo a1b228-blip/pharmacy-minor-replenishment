@@ -641,14 +641,14 @@
                 // 靜態環境（如 GitHub Pages）切換至前端渲染引擎
             }
 
-            // 2. 前端專用乾淨容器 (完全不受網頁滾動、螢幕解析度干擾，確保左右零裁切且完整單頁)
+            // 2. 前端專用乾淨容器 (完全不受網頁滾動干擾，確保左右零裁切且資料多時自然產生第二頁)
             const container = document.createElement('div');
             container.style.width = '1060px';
             container.style.backgroundColor = '#ffffff';
             container.style.boxSizing = 'border-box';
             container.style.padding = '8px 10px';
-            container.style.margin = '0';
-            container.style.position = 'fixed';
+            container.style.margin = '0 auto';
+            container.style.position = 'absolute';
             container.style.left = '0';
             container.style.top = '0';
             container.style.zIndex = '999999';
@@ -680,8 +680,9 @@
             });
             table.appendChild(colgroup);
 
-            // 表頭
+            // 表頭 (換頁時在每頁頂部自動重複表頭)
             const thead = document.createElement('thead');
+            thead.style.display = 'table-header-group';
             const thRow = document.createElement('tr');
             thRow.style.backgroundColor = '#f1f5f9';
 
@@ -703,15 +704,16 @@
             thead.appendChild(thRow);
             table.appendChild(thead);
 
-            // 表身 (動態最適字級：28筆資料時 8.6px，內距 1.5px 2px)
+            // 表身 (字級 8.8px 清晰易讀；<=28筆單頁，超過時自然換至第二頁)
             const tbody = document.createElement('tbody');
-            const rowCount = filteredData.length;
-            const dataFontSize = rowCount > 30 ? '7.5px' : (rowCount > 24 ? '8.6px' : '9.2px');
-            const dataPadding = rowCount > 30 ? '1px 1.5px' : '1.5px 2px';
+            const dataFontSize = '8.8px';
+            const dataPadding = '1.8px 2.5px';
 
             filteredData.forEach((row, idx) => {
                 const tr = document.createElement('tr');
                 tr.style.backgroundColor = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+                tr.style.pageBreakInside = 'avoid';
+                tr.style.breakInside = 'avoid';
 
                 selectedColumns.forEach(colId => {
                     const td = document.createElement('td');
@@ -754,23 +756,25 @@
             table.appendChild(tbody);
             container.appendChild(table);
 
-            // 簽核區 (靠右放，發料藥佐與核對藥師)
+            // 簽核區 (靠右放，發料藥佐與核對藥師，換頁不被切碎)
             const sigDiv = document.createElement('div');
             sigDiv.style.display = 'flex';
             sigDiv.style.justifyContent = 'flex-end';
             sigDiv.style.gap = '36px';
-            sigDiv.style.marginTop = '8px';
+            sigDiv.style.marginTop = '10px';
             sigDiv.style.paddingTop = '4px';
             sigDiv.style.fontSize = '9.5px';
             sigDiv.style.fontWeight = '600';
             sigDiv.style.color = '#1e293b';
+            sigDiv.style.pageBreakInside = 'avoid';
+            sigDiv.style.breakInside = 'avoid';
             sigDiv.innerHTML = '<div>發料藥佐：____________________</div><div>核對藥師：____________________</div>';
             container.appendChild(sigDiv);
 
             document.body.appendChild(container);
 
             const opt = {
-                margin: [5, 6, 5, 6], // 上下 5mm，左右 6mm 保證完全不裁切且完美置中
+                margin: [6, 6, 6, 6], // 上下左右均留 6mm 安全邊界，保證兩側 100% 不裁切且視覺置中
                 filename: pdfFilename,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { 
@@ -780,7 +784,7 @@
                     backgroundColor: '#ffffff'
                 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-                pagebreak: { mode: 'avoid-all' }
+                pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
             };
 
             try {
@@ -794,6 +798,7 @@
                 btnExportPdf.innerHTML = '<span>📄</span> 匯出單頁橫式 PDF (A4 最適化)';
             }
         }
+
 
 
 
