@@ -16,6 +16,7 @@
 - 醫院內部電腦若無法連外網，可直接雙擊本機 `index.html` 離線開啟（本工具核心函式庫已預留離線相容）。
 
 ## 🕐 最後更新
-- 時間：2026-09-03 22:50
+- 時間：2026-09-03 22:51
 - 更新者：Antigravity @ jiangruiyideMacBook-Air.local
-- Git push：待推（L2 初始化中）
+- Git push：✅ 已推（a1b228-blip/pharmacy-minor-replenishment）
+
