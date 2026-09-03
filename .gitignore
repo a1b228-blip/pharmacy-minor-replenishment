@@ -5,3 +5,6 @@ desktop.ini
 *.key
 credentials.*
 .DS_Store
+__pycache__/
+*.log
+*.png

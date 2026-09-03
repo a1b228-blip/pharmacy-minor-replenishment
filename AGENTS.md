@@ -19,8 +19,11 @@
 ├── AGENTS.md                 # 專案藍圖 (L1)
 ├── handoff.md                # 交接進度檔 (L1)
 ├── .gitignore                # Git 忽略檔案 (L2)
-└── index.html                # 撥補單列印助手主程式 (方案一)
+├── index.html                # 撥補單列印助手前端主程式 (GitHub Pages 線上版)
+├── convert.py                # Python ReportLab 向量 PDF 轉檔腳本
+└── server.py                 # 本地端 HTTP 伺服器與高畫質 PDF API
 ```
+
 
 ## 同步層級（本專案初始化至第 3 層級）
 
