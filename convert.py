@@ -2,12 +2,11 @@
 # -*- coding: utf-8 -*-
 """
 藥劑科小藥撥補單 - 主管格式轉換器 (Excel + A4 單頁橫式 PDF)
-依需求客製化：
+依最新指示排版：
 1. 移除日期/筆數等副標題文字
-2. 移除「製表人」
-3. 「發料藥佐/藥師」改為「發料藥佐」
-4. 新增「核對藥師」簽名欄位
-5. 字體最大化（7.5pt），全表嚴格容納於 1 張 A4 橫式紙張
+2. 移除「製表人」與「領料單位簽收」
+3. 簽名欄僅保留「發料藥佐」與「核對藥師」，並靠右排版
+4. 字體最大化（8.3pt），嚴格容納於 1 張 A4 橫式紙張
 """
 
 import sys
@@ -140,30 +139,30 @@ def generate_single_page_pdf(headers, rows, dest_pdf):
         pagesize=landscape(A4),
         leftMargin=margin,
         rightMargin=margin,
-        topMargin=8,
-        bottomMargin=8
+        topMargin=6,
+        bottomMargin=6
     )
 
     row_count = len(rows)
-    # 動態字級最適化（最大化字體）
+    # 動態字級最適化（8.3pt 最大化清晰字級）
     if row_count > 32:
-        font_size = 7.0
-        leading = 8.0
-        padding = 0.8
-    elif row_count > 25:
-        font_size = 7.5
-        leading = 8.5
+        font_size = 7.2
+        leading = 8.2
         padding = 1.0
+    elif row_count > 25:
+        font_size = 8.3
+        leading = 9.4
+        padding = 1.2
     else:
-        font_size = 8.2
-        leading = 9.5
-        padding = 1.6
+        font_size = 9.0
+        leading = 10.5
+        padding = 1.8
 
     title_style = ParagraphStyle(
         'TitleStyle',
         fontName='Chinese',
-        fontSize=14,
-        leading=16,
+        fontSize=15,
+        leading=17,
         alignment=1,
         textColor=colors.HexColor('#0f172a')
     )
@@ -173,7 +172,7 @@ def generate_single_page_pdf(headers, rows, dest_pdf):
         Spacer(1, 4)
     ]
 
-    col_widths = [48, 78, 42, 52, 34, 34, 52, 42, 145, 78, 24, 32, 32, 132]
+    col_widths = [48, 80, 40, 50, 34, 34, 52, 42, 145, 78, 24, 32, 32, 134]
 
     table_data = []
     header_cells = []
@@ -198,7 +197,7 @@ def generate_single_page_pdf(headers, rows, dest_pdf):
     t = Table(table_data, colWidths=col_widths, repeatRows=1)
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#f1f5f9')),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#475569')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#334155')),
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('TOPPADDING', (0,0), (-1,-1), padding),
         ('BOTTOMPADDING', (0,0), (-1,-1), padding),
@@ -206,15 +205,15 @@ def generate_single_page_pdf(headers, rows, dest_pdf):
         ('RIGHTPADDING', (0,0), (-1,-1), 1.5),
     ]))
     elements.append(t)
-    elements.append(Spacer(1, 6))
+    elements.append(Spacer(1, 8))
 
-    # 底端簽核欄位（移除製表人、發料藥佐、新增核對藥師、領料單位簽收）
+    # 簽名欄位靠右對齊 (發料藥佐、核對藥師)
     sig_data = [[
-        Paragraph('發料藥佐：_______________________', ParagraphStyle('S1', fontName='Chinese', fontSize=9, alignment=0)),
-        Paragraph('核對藥師：_______________________', ParagraphStyle('S2', fontName='Chinese', fontSize=9, alignment=1)),
-        Paragraph('領料單位簽收：_______________________', ParagraphStyle('S3', fontName='Chinese', fontSize=9, alignment=2))
+        '', # 左側彈性空間，將兩組簽名推向右側
+        Paragraph('發料藥佐：_______________________', ParagraphStyle('S1', fontName='Chinese', fontSize=9.5, alignment=2)),
+        Paragraph('核對藥師：_______________________', ParagraphStyle('S2', fontName='Chinese', fontSize=9.5, alignment=2))
     ]]
-    t_sig = Table(sig_data, colWidths=[275, 275, 275])
+    t_sig = Table(sig_data, colWidths=[405, 210, 210])
     t_sig.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
         ('LEFTPADDING', (0,0), (-1,-1), 0),

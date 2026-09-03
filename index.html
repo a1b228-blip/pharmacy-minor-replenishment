@@ -71,7 +71,7 @@
             .print-table {
                 width: 100% !important;
                 border-collapse: collapse !important;
-                font-size: 8.2pt !important;
+                font-size: 8.3pt !important;
                 line-height: 1.15 !important;
                 table-layout: auto !important;
             }
@@ -103,7 +103,8 @@
             .signature-block {
                 margin-top: 10px !important;
                 display: flex !important;
-                justify-content: space-between !important;
+                justify-content: flex-end !important;
+                gap: 32px !important;
                 font-size: 9.5pt !important;
                 font-weight: 600 !important;
                 page-break-inside: avoid !important;
@@ -210,7 +211,7 @@
             </div>
         </section>
 
-        <!-- 列印與預覽區域 (乾淨俐落表頭、字體最大化、三方簽核) -->
+        <!-- 列印與預覽區域 (標題大氣乾淨、簽核靠右) -->
         <main id="print-area" class="hidden bg-white p-3 sm:p-5 rounded-2xl shadow-sm border border-gray-200 space-y-2">
             
             <!-- 表頭主標題 (已移除副標題與日期筆數說明文字) -->
@@ -230,11 +231,10 @@
                 </table>
             </div>
 
-            <!-- 表尾簽核區 (無製表人，包含：發料藥佐、核對藥師、領料單位簽收) -->
-            <div class="signature-block pt-3 mt-3 flex justify-between text-xs sm:text-sm font-medium text-gray-800">
+            <!-- 表尾簽核區 (簽名欄靠右放：發料藥佐、核對藥師) -->
+            <div class="signature-block pt-3 mt-3 flex justify-end gap-10 text-xs sm:text-sm font-medium text-gray-800">
                 <div>發料藥佐：____________________</div>
                 <div>核對藥師：____________________</div>
-                <div>領料單位簽收：____________________</div>
             </div>
 
         </main>
@@ -280,7 +280,7 @@
             { id: '單位簽收人/日期', name: '單位簽收人/日期', defaultSelected: true }
         ];
 
-        const STORAGE_KEY = 'cch_pharmacy_supervisor_cols_v4';
+        const STORAGE_KEY = 'cch_pharmacy_supervisor_cols_v5';
 
         let rawData = [];
         let filteredData = [];
@@ -543,7 +543,7 @@
             });
         }
 
-        // --- 核心：匯出單頁橫式 A4 PDF (字體最大化) ---
+        // --- 核心：匯出單頁橫式 A4 PDF (字體最大化，簽核靠右) ---
         async function exportToSinglePagePDF() {
             if (!filteredData || filteredData.length === 0) {
                 alert('無可匯出之資料');
@@ -567,7 +567,6 @@
             document.body.appendChild(clone);
 
             const rowCount = filteredData.length;
-            // 字體放大最佳化
             let fontSize = '9.5px';
             let cellPadding = '2.5px 3px';
 
@@ -575,7 +574,7 @@
                 fontSize = '7.5px';
                 cellPadding = '1.2px 2px';
             } else if (rowCount > 25) {
-                fontSize = '8.2px';
+                fontSize = '8.3px';
                 cellPadding = '1.8px 2.5px';
             }
 
@@ -587,9 +586,12 @@
 
             const sigBlock = clone.querySelector('.signature-block');
             if (sigBlock) {
-                sigBlock.style.marginTop = '10px';
+                sigBlock.style.marginTop = '12px';
                 sigBlock.style.paddingTop = '6px';
                 sigBlock.style.fontSize = '9.5px';
+                sigBlock.style.display = 'flex';
+                sigBlock.style.justifyContent = 'flex-end';
+                sigBlock.style.gap = '36px';
             }
 
             const now = new Date();
