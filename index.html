@@ -543,7 +543,7 @@
             });
         }
 
-        // --- 核心：匯出單頁橫式 A4 PDF (字體最大化，簽核靠右) ---
+        // --- 核心：匯出單頁橫式 A4 PDF (徹底解決空白問題) ---
         async function exportToSinglePagePDF() {
             if (!filteredData || filteredData.length === 0) {
                 alert('無可匯出之資料');
@@ -553,75 +553,71 @@
             btnExportPdf.disabled = true;
             btnExportPdf.innerHTML = '<span>⏳</span> 產生單頁 PDF 中...';
 
-            const printElement = document.getElementById('print-area');
-            const clone = printElement.cloneNode(true);
-
-            clone.style.width = '1120px';
-            clone.style.padding = '8px 10px';
-            clone.style.margin = '0';
-            clone.style.backgroundColor = '#ffffff';
-            clone.style.position = 'fixed';
-            clone.style.top = '-9999px';
-            clone.style.left = '-9999px';
-            clone.style.boxSizing = 'border-box';
-            document.body.appendChild(clone);
-
-            const rowCount = filteredData.length;
-            let fontSize = '9.5px';
-            let cellPadding = '2.5px 3px';
-
-            if (rowCount > 32) {
-                fontSize = '7.5px';
-                cellPadding = '1.2px 2px';
-            } else if (rowCount > 25) {
-                fontSize = '8.3px';
-                cellPadding = '1.8px 2.5px';
-            }
-
-            clone.querySelectorAll('th, td').forEach(cell => {
-                cell.style.fontSize = fontSize;
-                cell.style.padding = cellPadding;
-                cell.style.lineHeight = '1.18';
-            });
-
-            const sigBlock = clone.querySelector('.signature-block');
-            if (sigBlock) {
-                sigBlock.style.marginTop = '12px';
-                sigBlock.style.paddingTop = '6px';
-                sigBlock.style.fontSize = '9.5px';
-                sigBlock.style.display = 'flex';
-                sigBlock.style.justifyContent = 'flex-end';
-                sigBlock.style.gap = '36px';
-            }
-
             const now = new Date();
             const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+            const pdfFilename = `藥品材料申請單_主管格式_A4單頁橫式_${dateStr}.pdf`;
+
+            // 1. 優先嘗試呼叫本地後端產出完美向量 PDF (字體清晰、不模糊、絕不空白)
+            try {
+                const res = await fetch('/api/pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        headers: TARGET_FIELDS,
+                        rows: filteredData
+                    })
+                });
+
+                if (res.ok) {
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = pdfFilename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    btnExportPdf.disabled = false;
+                    btnExportPdf.innerHTML = '<span>📄</span> 匯出單頁橫式 PDF (A4 最適化)';
+                    return;
+                }
+            } catch (err) {
+                console.log("未連線至本地 Python 伺服器，切換至前端渲染引擎...");
+            }
+
+            // 2. 降級備用方案：前端 html2pdf (直接以畫面上已可見的 #print-area 為目標，絕不用負座標)
+            const printElement = document.getElementById('print-area');
+            printElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            await new Promise(r => setTimeout(r, 200));
 
             const opt = {
-                margin: [3, 4, 3, 4],
-                filename: `藥品材料申請單_A4單頁橫式_${dateStr}.pdf`,
+                margin: [4, 4, 4, 4],
+                filename: pdfFilename,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { 
-                    scale: 2.5, 
+                    scale: 2, 
                     useCORS: true, 
                     logging: false,
-                    windowWidth: 1120
+                    backgroundColor: '#ffffff',
+                    scrollY: -window.scrollY,
+                    scrollX: -window.scrollX
                 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
                 pagebreak: { mode: 'avoid-all' }
             };
 
             try {
-                await html2pdf().set(opt).from(clone).save();
+                await html2pdf().set(opt).from(printElement).save();
             } catch (err) {
                 console.error("PDF 產出失敗:", err);
-                alert("PDF 產出失敗，請改用「列印預覽」另存 PDF。");
+                alert("PDF 產出失敗，請改用「列印預覽 (A4 橫向)」按鈕並在列印視窗選擇「另存為 PDF」。");
             } finally {
-                document.body.removeChild(clone);
                 btnExportPdf.disabled = false;
                 btnExportPdf.innerHTML = '<span>📄</span> 匯出單頁橫式 PDF (A4 最適化)';
             }
         }
+
 
         // 匯出主管格式 Excel
         function exportCleanExcel() {
