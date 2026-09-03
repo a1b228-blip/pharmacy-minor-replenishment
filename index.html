@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>佳里奇美醫院 藥劑科小藥撥補單列印助手</title>
+    <!-- Tailwind CSS (支援有外網時的現代 UI) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- SheetJS (Excel 解析與匯出函式庫) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* 基礎字體與樣式 */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+        }
+
+        /* 拖曳區域動畫 */
+        .dropzone-active {
+            border-color: #2563eb !important;
+            background-color: #eff6ff !important;
+            transform: scale(1.01);
+        }
+
+        /* 列印專用樣式 (@media print) */
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 8mm 8mm 8mm 8mm;
+            }
+
+            /* 隱藏所有非列印介面 */
+            .no-print, header, nav, .upload-section, .controls-section, .action-buttons, footer {
+                display: none !important;
+            }
+
+            body {
+                background: white !important;
+                color: black !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            #print-area {
+                display: block !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+            }
+
+            .print-table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                font-size: 9pt !important;
+            }
+
+            .print-table th, .print-table td {
+                border: 1px solid #475569 !important;
+                padding: 4px 6px !important;
+                color: black !important;
+                background: transparent !important;
+            }
+
+            .print-table th {
+                background-color: #f1f5f9 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                font-weight: 700 !important;
+            }
+
+            thead {
+                display: table-header-group !important;
+            }
+
+            tr {
+                page-break-inside: avoid !important;
+            }
+
+            .signature-block {
+                margin-top: 15px !important;
+                display: flex !important;
+                justify-content: space-between !important;
+                font-size: 10pt !important;
+                font-weight: 600 !important;
+                page-break-inside: avoid !important;
+            }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="max-w-7xl mx-auto space-y-6">
+
+        <!-- 頂部導覽列 (列印時隱藏) -->
+        <header class="no-print bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-teal-600 flex items-center justify-center text-white font-black text-xl shadow-md">
+                    奇美
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-900 tracking-tight">佳里奇美醫院 藥劑科小藥撥補單列印助手</h1>
+                    <p class="text-sm text-gray-500 mt-0.5">自動過濾匯出檔案多餘欄位 • A4 橫向最佳化列印 • 精簡 Excel 快速匯出</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="btn-load-sample" class="px-3.5 py-2 text-xs font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-lg transition border border-teal-200">
+                    📂 載入範例資料測試
+                </button>
+            </div>
+        </header>
+
+        <!-- 拖曳上傳與功能區 (列印時隱藏) -->
+        <section class="no-print bg-white p-6 rounded-2xl shadow-sm border border-gray-200 upload-section space-y-4">
+            <div id="dropzone" class="border-2 border-dashed border-gray-300 hover:border-teal-500 rounded-xl p-8 text-center cursor-pointer transition-all bg-gray-50 hover:bg-teal-50/40 group">
+                <input type="file" id="file-input" accept=".xlsx, .xls" class="hidden">
+                <div class="space-y-2 pointer-events-none">
+                    <div class="w-14 h-14 mx-auto rounded-full bg-teal-100 text-teal-600 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                        📊
+                    </div>
+                    <h2 class="text-lg font-semibold text-gray-700">拖放 Excel 檔案至此處，或點擊選擇檔案</h2>
+                    <p class="text-sm text-gray-500">支援從「統計分析」匯出的 <code class="bg-gray-200 px-2 py-0.5 rounded text-xs">藥品材料申請單_*.xlsx</code></p>
+                </div>
+            </div>
+
+            <!-- 檔案資訊列 (載入後顯示) -->
+            <div id="file-info-bar" class="hidden flex flex-wrap items-center justify-between gap-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900">
+                <div class="flex items-center gap-3">
+                    <span class="text-xl">✅</span>
+                    <div>
+                        <p class="font-bold text-sm" id="loaded-filename">未選取檔案</p>
+                        <p class="text-xs text-emerald-700" id="loaded-file-meta">共 0 筆資料</p>
+                    </div>
+                </div>
+                <button id="btn-clear" class="text-xs font-semibold text-red-600 hover:text-red-800 underline">
+                    清除重新選擇
+                </button>
+            </div>
+        </section>
+
+        <!-- 控制面板：欄位自訂與列印設定 (列印時隱藏) -->
+        <section id="controls-section" class="no-print hidden bg-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-5">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100 pb-4">
+                <div class="flex items-center gap-2">
+                    <h3 class="font-bold text-gray-800 text-base">⚙️ 欄位管理與列印設定</h3>
+                    <span class="text-xs text-gray-400">（設定自動儲存，下次開啟沿用）</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <button id="preset-default-btn" class="px-3 py-1.5 text-xs font-medium bg-teal-600 text-white hover:bg-teal-700 rounded-md transition shadow-sm">
+                        ⭐ 建議列印欄位
+                    </button>
+                    <button id="select-all-btn" class="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-md transition">
+                        全選
+                    </button>
+                    <button id="deselect-all-btn" class="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-md transition">
+                        全消
+                    </button>
+                </div>
+            </div>
+
+            <!-- 欄位多選核取清單 -->
+            <div id="columns-checkbox-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                <!-- 由 JavaScript 自動產生 23 欄開關 -->
+            </div>
+
+            <!-- 排序與過濾輔助 -->
+            <div class="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-100">
+                <div class="flex items-center gap-4 text-sm text-gray-600">
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" id="sort-by-unit" class="rounded text-teal-600 focus:ring-teal-500" checked>
+                        <span>依「申請單位」排序分組</span>
+                    </label>
+                    <label class="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" id="hide-cancelled" class="rounded text-teal-600 focus:ring-teal-500" checked>
+                        <span>排除已取消/無法發料</span>
+                    </label>
+                </div>
+
+                <!-- 動作按鈕組 -->
+                <div class="flex items-center gap-3">
+                    <button id="btn-export-excel" class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow-sm transition">
+                        <span>📥</span> 匯出精簡 Excel
+                    </button>
+                    <button id="btn-print" class="inline-flex items-center gap-1.5 px-6 py-2.5 bg-teal-700 hover:bg-teal-800 text-white rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition">
+                        <span>🖨️</span> 列印 / 另存 PDF (A4 橫向)
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 列印與預覽區域 (列印時唯一保留顯示區) -->
+        <main id="print-area" class="hidden bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-gray-200 space-y-4">
+            
+            <!-- 表頭資訊 -->
+            <div class="border-b-2 border-gray-800 pb-3">
+                <div class="flex justify-between items-end">
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-black text-gray-900 tracking-wide">佳里奇美醫院 藥劑科小藥撥補清單</h2>
+                        <p class="text-xs text-gray-600 mt-1" id="print-meta-summary">
+                            列印日期：<span id="print-date"></span> ｜ 資料總筆數：<span id="print-count">0</span> 筆
+                        </p>
+                    </div>
+                    <div class="text-right text-xs text-gray-500 font-medium no-print">
+                        【A4 橫向列印最佳化預覽】
+                    </div>
+                </div>
+            </div>
+
+            <!-- 資料表格 -->
+            <div class="overflow-x-auto">
+                <table class="print-table w-full text-left border-collapse text-xs">
+                    <thead id="table-head">
+                        <!-- 表頭動態產生 -->
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- 資料列動態產生 -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 表尾簽核區 (符合醫院標準作業簽收規範) -->
+            <div class="signature-block pt-6 border-t border-gray-400 mt-6 flex justify-between text-xs sm:text-sm font-medium text-gray-800">
+                <div>製表人：____________________</div>
+                <div>發料藥佐 / 藥師：____________________</div>
+                <div>領料單位簽收人：____________________</div>
+            </div>
+
+        </main>
+
+        <!-- 初始空狀態提示 (尚未載入資料時) -->
+        <div id="empty-state" class="no-print text-center py-12 text-gray-400">
+            <p class="text-base">請先將從系統匯出的 Excel 檔案拖入上方區域，或點擊「載入範例資料測試」。</p>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 欄位常數定義 (對照 5500 系統匯出的 23 個欄位) ---
+        const ALL_COLUMNS = [
+            { id: '申請單號', name: '申請單號', defaultSelected: true },
+            { id: '申請時間', name: '申請時間', defaultSelected: false },
+            { id: '申請狀態', name: '申請狀態', defaultSelected: false },
+            { id: '申請單位', name: '申請單位', defaultSelected: true },
+            { id: '費用部門代號', name: '費用代號', defaultSelected: true },
+            { id: '申請人', name: '申請人', defaultSelected: true },
+            { id: '送簽主管', name: '送簽主管', defaultSelected: false },
+            { id: '實際簽核主管', name: '實際簽核主管', defaultSelected: false },
+            { id: '主管備註', name: '主管備註', defaultSelected: false },
+            { id: '發料日期', name: '發料日期', defaultSelected: true },
+            { id: '發料藥佐', name: '發料藥佐', defaultSelected: false },
+            { id: '核對藥師', name: '核對藥師', defaultSelected: false },
+            { id: '領料品項名稱', name: '領料品項名稱', defaultSelected: true },
+            { id: '材料編號', name: '材料編號', defaultSelected: true },
+            { id: '單位', name: '單位', defaultSelected: true },
+            { id: '申請數量', name: '申請數量', defaultSelected: true },
+            { id: '品項申請備註', name: '品項備註', defaultSelected: false },
+            { id: '發料數量', name: '發料數量', defaultSelected: true },
+            { id: '品項發料備註', name: '發料備註', defaultSelected: false },
+            { id: '總備註', name: '總備註', defaultSelected: true },
+            { id: '發料單位總備註', name: '發料備註(總)', defaultSelected: false },
+            { id: '申請單位簽收人', name: '簽收人', defaultSelected: false },
+            { id: '簽收時間', name: '簽收時間', defaultSelected: false }
+        ];
+
+        const STORAGE_KEY = 'cch_pharmacy_print_selected_cols';
+
+        // 狀態管理
+        let rawData = [];
+        let filteredData = [];
+        let selectedColumns = loadSavedColumns();
+
+        // 讀取/儲存自訂欄位設定
+        function loadSavedColumns() {
+            try {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    return JSON.parse(saved);
+                }
+            } catch (e) {
+                console.error("無法讀取儲存的欄位設定", e);
+            }
+            // 若無紀錄則使用建議預設值
+            return ALL_COLUMNS.filter(c => c.defaultSelected).map(c => c.id);
+        }
+
+        function saveColumns(cols) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(cols));
+            } catch (e) {
+                console.error("儲存欄位設定失敗", e);
+            }
+        }
+
+        // --- DOM 元素快取 ---
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('file-input');
+        const fileInfoBar = document.getElementById('file-info-bar');
+        const loadedFilename = document.getElementById('loaded-filename');
+        const loadedFileMeta = document.getElementById('loaded-file-meta');
+        const btnClear = document.getElementById('btn-clear');
+        const controlsSection = document.getElementById('controls-section');
+        const columnsContainer = document.getElementById('columns-checkbox-container');
+        const presetDefaultBtn = document.getElementById('preset-default-btn');
+        const selectAllBtn = document.getElementById('select-all-btn');
+        const deselectAllBtn = document.getElementById('deselect-all-btn');
+        const sortByUnitCheckbox = document.getElementById('sort-by-unit');
+        const hideCancelledCheckbox = document.getElementById('hide-cancelled');
+        const printArea = document.getElementById('print-area');
+        const tableHead = document.getElementById('table-head');
+        const tableBody = document.getElementById('table-body');
+        const emptyState = document.getElementById('empty-state');
+        const btnPrint = document.getElementById('btn-print');
+        const btnExportExcel = document.getElementById('btn-export-excel');
+        const btnLoadSample = document.getElementById('btn-load-sample');
+        const printDateSpan = document.getElementById('print-date');
+        const printCountSpan = document.getElementById('print-count');
+
+        // --- 初始化頁面 ---
+        function init() {
+            renderColumnCheckboxes();
+            bindEvents();
+            updatePrintDate();
+        }
+
+        function updatePrintDate() {
+            const now = new Date();
+            printDateSpan.textContent = now.toLocaleDateString('zh-TW', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // 渲染欄位開關
+        function renderColumnCheckboxes() {
+            columnsContainer.innerHTML = '';
+            ALL_COLUMNS.forEach(col => {
+                const label = document.createElement('label');
+                label.className = "flex items-center gap-2 text-xs text-gray-700 bg-gray-50 hover:bg-teal-50/50 p-2 rounded border border-gray-200 cursor-pointer select-none transition";
+                
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = col.id;
+                cb.checked = selectedColumns.includes(col.id);
+                cb.className = "rounded text-teal-600 focus:ring-teal-500";
+                
+                cb.addEventListener('change', () => {
+                    if (cb.checked) {
+                        if (!selectedColumns.includes(col.id)) selectedColumns.push(col.id);
+                    } else {
+                        selectedColumns = selectedColumns.filter(id => id !== col.id);
+                    }
+                    saveColumns(selectedColumns);
+                    renderTable();
+                });
+
+                const span = document.createElement('span');
+                span.textContent = col.name;
+                if (col.defaultSelected) {
+                    span.classList.add('font-semibold', 'text-teal-900');
+                }
+
+                label.appendChild(cb);
+                label.appendChild(span);
+                columnsContainer.appendChild(label);
+            });
+        }
+
+        // 綁定事件監聽
+        function bindEvents() {
+            // 點擊上傳
+            dropzone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', handleFileSelect);
+
+            // 拖曳上傳
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.add('dropzone-active');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropzone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    dropzone.classList.remove('dropzone-active');
+                });
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                if (files.length > 0) {
+                    processFile(files[0]);
+                }
+            });
+
+            // 清除資料
+            btnClear.addEventListener('click', resetAll);
+
+            // 快捷欄位按鈕
+            presetDefaultBtn.addEventListener('click', () => {
+                selectedColumns = ALL_COLUMNS.filter(c => c.defaultSelected).map(c => c.id);
+                saveColumns(selectedColumns);
+                renderColumnCheckboxes();
+                renderTable();
+            });
+
+            selectAllBtn.addEventListener('click', () => {
+                selectedColumns = ALL_COLUMNS.map(c => c.id);
+                saveColumns(selectedColumns);
+                renderColumnCheckboxes();
+                renderTable();
+            });
+
+            deselectAllBtn.addEventListener('click', () => {
+                selectedColumns = [];
+                saveColumns(selectedColumns);
+                renderColumnCheckboxes();
+                renderTable();
+            });
+
+            sortByUnitCheckbox.addEventListener('change', processAndFilterData);
+            hideCancelledCheckbox.addEventListener('change', processAndFilterData);
+
+            // 列印與匯出
+            btnPrint.addEventListener('click', () => {
+                updatePrintDate();
+                window.print();
+            });
+
+            btnExportExcel.addEventListener('click', exportCleanExcel);
+
+            // 測試資料
+            btnLoadSample.addEventListener('click', loadSampleData);
+        }
+
+        // 處理選擇檔案
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                processFile(file);
+            }
+        }
+
+        // 核心：讀取並解析 Excel
+        function processFile(file) {
+            loadedFilename.textContent = file.name;
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+                    if (!json || json.length === 0) {
+                        alert('讀取的 Excel 檔案中沒有資料！');
+                        return;
+                    }
+
+                    rawData = json;
+                    fileInfoBar.classList.remove('hidden');
+                    controlsSection.classList.remove('hidden');
+                    printArea.classList.remove('hidden');
+                    emptyState.classList.add('hidden');
+
+                    processAndFilterData();
+
+                } catch (err) {
+                    console.error("Excel 解析錯誤:", err);
+                    alert("檔案解析失敗，請確認是否為由系統匯出之有效 Excel 檔案。");
+                }
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 資料整理與篩選
+        function processAndFilterData() {
+            if (!rawData || rawData.length === 0) return;
+
+            let list = [...rawData];
+
+            // 1. 排除已取消 / 無法發料
+            if (hideCancelledCheckbox.checked) {
+                list = list.filter(row => {
+                    const status = row['申請狀態'] || '';
+                    return status !== '申請取消' && status !== '無法發料' && status !== '主管退回';
+                });
+            }
+
+            // 2. 排序
+            if (sortByUnitCheckbox.checked) {
+                list.sort((a, b) => {
+                    const unitA = (a['申請單位'] || '') + (a['費用部門代號'] || '');
+                    const unitB = (b['申請單位'] || '') + (b['費用部門代號'] || '');
+                    if (unitA !== unitB) return unitA.localeCompare(unitB, 'zh-TW');
+                    return (a['材料編號'] || '').localeCompare(b['材料編號'] || '', 'zh-TW');
+                });
+            }
+
+            filteredData = list;
+            loadedFileMeta.textContent = `共 ${rawData.length} 筆資料 (有效呈現 ${filteredData.length} 筆)`;
+            printCountSpan.textContent = filteredData.length;
+
+            renderTable();
+        }
+
+        // 渲染表格
+        function renderTable() {
+            tableHead.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            if (selectedColumns.length === 0) {
+                tableBody.innerHTML = `<tr><td class="text-center py-6 text-gray-400">尚未勾選任何欄位，請在上方欄位設定中勾選。</td></tr>`;
+                return;
+            }
+
+            // 1. 表頭
+            const headerRow = document.createElement('tr');
+            headerRow.className = "bg-gray-100 font-bold border-b border-gray-300";
+
+            // 序號欄位 (固定自動產生，方便清點)
+            const thIndex = document.createElement('th');
+            thIndex.textContent = '項次';
+            thIndex.className = "p-2 text-center w-12";
+            headerRow.appendChild(thIndex);
+
+            selectedColumns.forEach(colId => {
+                const th = document.createElement('th');
+                th.textContent = colId;
+                th.className = "p-2 font-bold";
+                if (colId.includes('數量') || colId === '單位') {
+                    th.classList.add('text-center');
+                }
+                headerRow.appendChild(th);
+            });
+            tableHead.appendChild(headerRow);
+
+            // 2. 內容列
+            filteredData.forEach((row, idx) => {
+                const tr = document.createElement('tr');
+                tr.className = idx % 2 === 0 ? "bg-white hover:bg-teal-50/20" : "bg-gray-50/50 hover:bg-teal-50/20";
+
+                // 項次
+                const tdIndex = document.createElement('td');
+                tdIndex.textContent = idx + 1;
+                tdIndex.className = "p-2 text-center text-gray-500 font-medium";
+                tr.appendChild(tdIndex);
+
+                selectedColumns.forEach(colId => {
+                    const td = document.createElement('td');
+                    let val = row[colId] ?? '';
+
+                    // 格式化日期
+                    if (val instanceof Date) {
+                        val = val.toLocaleDateString('zh-TW');
+                    }
+
+                    td.textContent = val;
+                    td.className = "p-2";
+
+                    if (colId.includes('數量') || colId === '單位') {
+                        td.classList.add('text-center', 'font-semibold');
+                    } else if (colId === '費用部門代號' || colId === '材料編號') {
+                        td.classList.add('font-mono');
+                    }
+
+                    tr.appendChild(td);
+                });
+
+                tableBody.appendChild(tr);
+            });
+        }
+
+        // 匯出精簡 Excel
+        function exportCleanExcel() {
+            if (!filteredData || filteredData.length === 0) {
+                alert('無可匯出之資料');
+                return;
+            }
+
+            const exportList = filteredData.map(row => {
+                const cleanRow = {};
+                selectedColumns.forEach(colId => {
+                    cleanRow[colId] = row[colId] ?? '';
+                });
+                return cleanRow;
+            });
+
+            const worksheet = XLSX.utils.json_to_sheet(exportList);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, '小藥撥補精簡清單');
+
+            const now = new Date();
+            const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+            XLSX.writeFile(workbook, `藥品材料申請單_列印精簡版_${dateStr}.xlsx`);
+        }
+
+        // 重設清空
+        function resetAll() {
+            rawData = [];
+            filteredData = [];
+            fileInput.value = '';
+            fileInfoBar.classList.add('hidden');
+            controlsSection.classList.add('hidden');
+            printArea.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+        }
+
+        // 載入範例資料供快速測試
+        function loadSampleData() {
+            const sample = [
+                {
+                    '申請單號': 'REQ-20260901-001',
+                    '申請時間': '2026/09/01 10:15:30',
+                    '申請狀態': '已發料',
+                    '申請單位': '急診醫學部',
+                    '費用部門代號': '3000',
+                    '申請人': '陳小明',
+                    '送簽主管': '林主任',
+                    '實際簽核主管': '林主任',
+                    '主管備註': '急診常備需求核准',
+                    '發料日期': '2026/09/03',
+                    '發料藥佐': '張藥佐',
+                    '核對藥師': '王藥師',
+                    '領料品項名稱': '75% 酒精 4000 mL',
+                    '材料編號': '03-002-42A025',
+                    '單位': '桶',
+                    '申請數量': 5,
+                    '品項申請備註': '急診消毒常備',
+                    '發料數量': 5,
+                    '品項發料備註': '',
+                    '總備註': '週四下午領取',
+                    '發料單位總備註': '已備妥放置B1藥庫門口',
+                    '申請單位簽收人': '',
+                    '簽收時間': ''
+                },
+                {
+                    '申請單號': 'REQ-20260901-001',
+                    '申請時間': '2026/09/01 10:15:30',
+                    '申請狀態': '已發料',
+                    '申請單位': '急診醫學部',
+                    '費用部門代號': '3000',
+                    '申請人': '陳小明',
+                    '送簽主管': '林主任',
+                    '實際簽核主管': '林主任',
+                    '主管備註': '',
+                    '發料日期': '2026/09/03',
+                    '發料藥佐': '張藥佐',
+                    '核對藥師': '王藥師',
+                    '領料品項名稱': 'NaCl(0.9%,20mL)針',
+                    '材料編號': '01-007-17N064',
+                    '單位': '盒',
+                    '申請數量': 10,
+                    '品項申請備註': '',
+                    '發料數量': 10,
+                    '品項發料備註': '',
+                    '總備註': '週四下午領取',
+                    '發料單位總備註': '',
+                    '申請單位簽收人': '',
+                    '簽收時間': ''
+                },
+                {
+                    '申請單號': 'REQ-20260902-004',
+                    '申請時間': '2026/09/02 14:20:00',
+                    '申請狀態': '已發料',
+                    '申請單位': '內科加護病房 (ICU)',
+                    '費用部門代號': '3200',
+                    '申請人': '李護理長',
+                    '送簽主管': '張部長',
+                    '實際簽核主管': '張部長',
+                    '主管備註': '同意撥補',
+                    '發料日期': '2026/09/03',
+                    '發料藥佐': '張藥佐',
+                    '核對藥師': '王藥師',
+                    '領料品項名稱': 'Lactated Ringer軟袋 (500mL)',
+                    '材料編號': '01-007-17L010',
+                    '單位': '包',
+                    '申請數量': 20,
+                    '品項申請備註': 'ICU點滴常備',
+                    '發料數量': 20,
+                    '品項發料備註': '',
+                    '總備註': '急件撥補',
+                    '發料單位總備註': '',
+                    '申請單位簽收人': '',
+                    '簽收時間': ''
+                },
+                {
+                    '申請單號': 'REQ-20260902-008',
+                    '申請時間': '2026/09/02 16:45:12',
+                    '申請狀態': '已發料',
+                    '申請單位': '5A 病房',
+                    '費用部門代號': '3500',
+                    '申請人': '黃護理師',
+                    '送簽主管': '劉督導',
+                    '實際簽核主管': '劉督導',
+                    '主管備註': '',
+                    '發料日期': '2026/09/03',
+                    '發料藥佐': '張藥佐',
+                    '核對藥師': '王藥師',
+                    '領料品項名稱': 'Xylocaine Jelly 2%30 gm',
+                    '材料編號': '31-002-32X012',
+                    '單位': '條',
+                    '申請數量': 8,
+                    '品項申請備註': '',
+                    '發料數量': 8,
+                    '品項發料備註': '',
+                    '總備註': '',
+                    '發料單位總備註': '',
+                    '申請單位簽收人': '',
+                    '簽收時間': ''
+                }
+            ];
+
+            loadedFilename.textContent = "範例資料_急診與ICU撥補.xlsx";
+            rawData = sample;
+            fileInfoBar.classList.remove('hidden');
+            controlsSection.classList.remove('hidden');
+            printArea.classList.remove('hidden');
+            emptyState.classList.add('hidden');
+            processAndFilterData();
+        }
+
+        // 啟動程式
+        init();
+    </script>
+</body>
+</html>
