@@ -12,16 +12,17 @@
 工具與轉換腳本皆測試完畢，產出格式與主管要求之欄位順序、名稱、寬度及格線 100% 一致。
 
 ## ➡️ 下一步
-提供主管線上網址：https://a1b228-blip.github.io/pharmacy-minor-replenishment/，直接在 Chrome 拖入每週下載的 Excel 即可使用。
+提供主管線上網址：https://a1b228-blip.github.io/pharmacy-minor-replenishment/，直接在 Chrome 拖入每週下載的 Excel 即可一鍵雙下載（Excel + PDF）。
 
 ## ⚠️ 注意事項
-- 網頁已發布於 GitHub Pages，免裝任何軟體，直接以 Chrome / Edge 開啟即可。
-- PDF 產出已採用獨立純淨 DOM 容器與左右 6mm 安全邊界，徹底消除水平滾動造成的左右裁切問題，保證 100% 容納於 1 頁 A4 橫式紙張。
+- 專案已通過本地端測試確認，版面設定完全鎖定，不再變動。
+- 點擊「📄 匯出主管格式 PDF (含 Excel)」時，系統自動先下載主管正確格式 Excel，並立即產出版面居中、左右零裁切、簽章靠右之高品質 PDF。
 
 ## 🕐 最後更新
-- 時間：2026-09-03 23:59
+- 時間：2026-09-04 00:26
 - 更新者：Antigravity @ jiangruiyideMacBook-Air.local
 - Git push：✅ 已推（線上網址：https://a1b228-blip.github.io/pharmacy-minor-replenishment/）
+
 
 
 
