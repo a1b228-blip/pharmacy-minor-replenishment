@@ -600,7 +600,7 @@
             });
         }
 
-        // --- 核心：匯出主管格式 (先自動下載 Excel，再精準產出 PDF) ---
+        // --- 核心：匯出主管格式 (先自動下載 Excel，再精準產出絕不留白之 PDF) ---
         async function exportToSinglePagePDF() {
             if (!filteredData || filteredData.length === 0) {
                 alert('無可匯出之資料');
@@ -612,207 +612,76 @@
 
             const now = new Date();
             const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-            const pdfFilename = `藥品材料申請單_主管格式_A4單頁橫式_${dateStr}.pdf`;
+            const pdfFilename = `藥品材料申請單_主管格式_A4橫式_${dateStr}.pdf`;
 
-            // 1. 依指示：先自動匯出並下載主管正確格式 Excel 檔！
+            // 1. 自動先下載主管正確格式 Excel 檔
             try {
                 exportCleanExcel();
             } catch (e) {
                 console.error("Excel 匯出失敗:", e);
             }
 
-            // 2. 優先嘗試呼叫本地後端產出完美向量 PDF
-            try {
-                const res = await fetch('/api/pdf', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        headers: TARGET_FIELDS,
-                        rows: filteredData
-                    })
-                });
+            // 2. 暫時隱藏上方控制項，讓表格自然直頂頁面 (offsetTop = 0)，徹底消滅空白首頁與幽靈元素問題！
+            const headerEl = document.querySelector('header');
+            const uploadEl = document.querySelector('.upload-section');
+            const controlsEl = document.getElementById('controls-section');
+            const printElement = document.getElementById('print-area');
+            const scrollContainer = printElement.querySelector('.overflow-x-auto');
 
-                if (res.ok) {
-                    const blob = await res.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = pdfFilename;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(url);
-                    btnExportPdf.disabled = false;
-                    btnExportPdf.innerHTML = '<span>📄</span> 匯出主管格式 PDF (含 Excel)';
-                    return;
+            const prevHeaderDisplay = headerEl ? headerEl.style.display : '';
+            const prevUploadDisplay = uploadEl ? uploadEl.style.display : '';
+            const prevControlsDisplay = controlsEl ? controlsEl.style.display : '';
+            const prevScrollLeft = scrollContainer ? scrollContainer.scrollLeft : 0;
+            const prevOverflow = scrollContainer ? scrollContainer.style.overflow : '';
+
+            try {
+                if (headerEl) headerEl.style.display = 'none';
+                if (uploadEl) uploadEl.style.display = 'none';
+                if (controlsEl) controlsEl.style.display = 'none';
+                if (scrollContainer) {
+                    scrollContainer.scrollLeft = 0;
+                    scrollContainer.style.overflow = 'visible';
                 }
-            } catch (err) {
-                // 靜態環境（如 GitHub Pages）進入前端專用頂部歸零渲染容器
-            }
 
-            // 3. 前端專用頂部歸零容器 (offsetTop=0 徹底消滅第 1 頁空白，左右 6mm 絕不裁切)
-            const container = document.createElement('div');
-            container.style.width = '1060px';
-            container.style.backgroundColor = '#ffffff';
-            container.style.boxSizing = 'border-box';
-            container.style.padding = '4px 6px';
-            container.style.margin = '0';
-            container.style.position = 'fixed';
-            container.style.top = '0';
-            container.style.left = '0';
-            container.style.zIndex = '999999';
-            container.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", "Microsoft JhengHei", sans-serif';
+                window.scrollTo(0, 0);
+                // 等待 150ms 讓瀏覽器完成重繪
+                await new Promise(r => setTimeout(r, 150));
 
-            // 標題
-            const titleDiv = document.createElement('div');
-            titleDiv.style.textAlign = 'center';
-            titleDiv.style.paddingBottom = '4px';
-            titleDiv.style.marginBottom = '6px';
-            titleDiv.style.borderBottom = '1px solid #cbd5e1';
-            titleDiv.innerHTML = '<h2 style="margin:0; padding:0; font-size: 16px; font-weight: 800; color: #0f172a; letter-spacing: 1px;">佳里奇美醫院 藥劑科小藥撥補單</h2>';
-            container.appendChild(titleDiv);
+                const opt = {
+                    margin: [5, 6, 5, 6], // 上下 5mm，左右 6mm 保證左右兩側 100% 不裁切
+                    filename: pdfFilename,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { 
+                        scale: 2, 
+                        useCORS: true, 
+                        logging: false,
+                        backgroundColor: '#ffffff',
+                        scrollX: 0,
+                        scrollY: 0
+                    },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+                    pagebreak: { mode: 'legacy' }
+                };
 
-            // 表格
-            const table = document.createElement('table');
-            table.style.width = '100%';
-            table.style.tableLayout = 'fixed';
-            table.style.borderCollapse = 'collapse';
-            table.style.margin = '0';
-            table.style.boxSizing = 'border-box';
+                await html2pdf().set(opt).from(printElement).save();
 
-            // 固定欄寬 colgroup
-            const colgroup = document.createElement('colgroup');
-            selectedColumns.forEach(colId => {
-                const col = document.createElement('col');
-                col.style.width = COL_PERCENTAGES[colId] || '7%';
-                colgroup.appendChild(col);
-            });
-            table.appendChild(colgroup);
-
-            // 表頭
-            const thead = document.createElement('thead');
-            thead.style.display = 'table-header-group';
-            const thRow = document.createElement('tr');
-            thRow.style.backgroundColor = '#f1f5f9';
-
-            selectedColumns.forEach(colId => {
-                const th = document.createElement('th');
-                const colDef = ALL_COLUMNS.find(c => c.id === colId);
-                th.innerHTML = (colDef ? colDef.name : colId).replace(/\n/g, '<br/>');
-                th.style.border = '0.8px solid #334155';
-                th.style.padding = '3px 2px';
-                th.style.fontSize = '9.2px';
-                th.style.lineHeight = '1.15';
-                th.style.textAlign = 'center';
-                th.style.fontWeight = 'bold';
-                th.style.color = '#0f172a';
-                th.style.boxSizing = 'border-box';
-                th.style.overflow = 'hidden';
-                thRow.appendChild(th);
-            });
-            thead.appendChild(thRow);
-            table.appendChild(thead);
-
-            // 表身 (字級 8.8px 清晰易讀，列距適中)
-            const tbody = document.createElement('tbody');
-            const dataFontSize = '8.8px';
-            const dataPadding = '1.8px 2.5px';
-
-            filteredData.forEach((row, idx) => {
-                const tr = document.createElement('tr');
-                tr.style.backgroundColor = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
-                tr.style.pageBreakInside = 'avoid';
-                tr.style.breakInside = 'avoid';
-
-                selectedColumns.forEach(colId => {
-                    const td = document.createElement('td');
-                    let val = row[colId] ?? '';
-                    if (val instanceof Date) {
-                        val = val.toLocaleString('zh-TW', { hour12: false });
-                    }
-
-                    td.textContent = val;
-                    td.style.border = '0.8px solid #334155';
-                    td.style.padding = dataPadding;
-                    td.style.fontSize = dataFontSize;
-                    td.style.lineHeight = '1.15';
-                    td.style.boxSizing = 'border-box';
-                    td.style.overflow = 'hidden';
-
-                    if (colId === '領料品項名稱') {
-                        td.style.textAlign = 'left';
-                        td.style.fontWeight = '500';
-                        td.style.whiteSpace = 'normal';
-                        td.style.wordBreak = 'break-all';
-                    } else if (colId === '材料編號') {
-                        td.style.textAlign = 'center';
-                        td.style.fontFamily = 'monospace';
-                        td.style.fontSize = '8.2px';
-                        td.style.whiteSpace = 'nowrap';
-                    } else if (colId.includes('數量') || colId === '單位') {
-                        td.style.textAlign = 'center';
-                        td.style.fontWeight = '600';
-                        td.style.whiteSpace = 'nowrap';
-                    } else {
-                        td.style.textAlign = 'center';
-                        td.style.whiteSpace = 'nowrap';
-                    }
-
-                    tr.appendChild(td);
-                });
-                tbody.appendChild(tr);
-            });
-            table.appendChild(tbody);
-            container.appendChild(table);
-
-            // 簽核區 (靠右放，發料藥佐與核對藥師)
-            const sigDiv = document.createElement('div');
-            sigDiv.style.display = 'flex';
-            sigDiv.style.justifyContent = 'flex-end';
-            sigDiv.style.gap = '36px';
-            sigDiv.style.marginTop = '10px';
-            sigDiv.style.paddingTop = '4px';
-            sigDiv.style.fontSize = '9.5px';
-            sigDiv.style.fontWeight = '600';
-            sigDiv.style.color = '#1e293b';
-            sigDiv.style.pageBreakInside = 'avoid';
-            sigDiv.style.breakInside = 'avoid';
-            sigDiv.innerHTML = '<div>發料藥佐：____________________</div><div>核對藥師：____________________</div>';
-            container.appendChild(sigDiv);
-
-            document.body.appendChild(container);
-
-            // 強制瀏覽器重排並等待 250ms 確保畫面繪製完畢 (徹底根除 0x0 空白)
-            container.getBoundingClientRect();
-            await new Promise(r => setTimeout(r, 250));
-
-            const opt = {
-                margin: [5, 6, 5, 6], // 上下 5mm，左右 6mm 保證左右兩側 100% 不裁切且完美置中
-                filename: pdfFilename,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { 
-                    scale: 2, 
-                    useCORS: true, 
-                    logging: false,
-                    backgroundColor: '#ffffff',
-                    scrollX: 0,
-                    scrollY: 0
-                },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-                pagebreak: { mode: 'legacy' } // 禁用 avoid-all 避免首頁被空推成空白
-            };
-
-            try {
-                await html2pdf().set(opt).from(container).save();
             } catch (err) {
                 console.error("PDF 產出失敗:", err);
                 alert("PDF 產出失敗，請改用「列印預覽 (A4 橫向)」按鈕並在列印視窗選擇「另存為 PDF」。");
             } finally {
-                document.body.removeChild(container);
+                // 恢復原始畫面結構
+                if (headerEl) headerEl.style.display = prevHeaderDisplay;
+                if (uploadEl) uploadEl.style.display = prevUploadDisplay;
+                if (controlsEl) controlsEl.style.display = prevControlsDisplay;
+                if (scrollContainer) {
+                    scrollContainer.scrollLeft = prevScrollLeft;
+                    scrollContainer.style.overflow = prevOverflow;
+                }
                 btnExportPdf.disabled = false;
                 btnExportPdf.innerHTML = '<span>📄</span> 匯出主管格式 PDF (含 Excel)';
             }
         }
+
 
 
 
